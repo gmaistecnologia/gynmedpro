@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Gynmed | Gerenciamento de Solicitações</title>
+<!-- Google Fonts: Montserrat & Inter -->
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&amp;family=Inter:wght@300;400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#0059af",
+              "on-error": "#ffffff",
+              "outline-variant": "#c1c6d5",
+              "on-tertiary-fixed-variant": "#005142",
+              "tertiary": "#006654",
+              "surface-bright": "#f8f9fa",
+              "tertiary-fixed-dim": "#56dcbd",
+              "primary-container": "#1271d8",
+              "primary-fixed-dim": "#a9c7ff",
+              "on-primary-fixed-variant": "#00468c",
+              "on-secondary-container": "#345d80",
+              "on-tertiary": "#ffffff",
+              "inverse-on-surface": "#f0f1f2",
+              "surface-container-lowest": "#ffffff",
+              "on-surface-variant": "#414753",
+              "on-primary": "#ffffff",
+              "surface-tint": "#005db7",
+              "secondary-container": "#add6fe",
+              "on-primary-container": "#f8f8ff",
+              "on-surface": "#191c1d",
+              "surface": "#f8f9fa",
+              "background": "#f8f9fa",
+              "error-container": "#ffdad6",
+              "surface-container-high": "#e7e8e9",
+              "inverse-primary": "#a9c7ff",
+              "on-secondary-fixed": "#001d32",
+              "surface-variant": "#e1e3e4",
+              "tertiary-container": "#00816b",
+              "error": "#ba1a1a",
+              "secondary-fixed": "#cde5ff",
+              "tertiary-fixed": "#76f9d9",
+              "on-tertiary-fixed": "#002019",
+              "surface-container-low": "#f3f4f5",
+              "secondary": "#396285",
+              "on-secondary": "#ffffff",
+              "secondary-fixed-dim": "#a2cbf3",
+              "on-tertiary-container": "#e1fff4",
+              "on-background": "#191c1d",
+              "surface-dim": "#d9dadb",
+              "on-primary-fixed": "#001b3d",
+              "on-secondary-fixed-variant": "#1e4a6c",
+              "surface-container-highest": "#e1e3e4",
+              "surface-container": "#edeeef",
+              "outline": "#727784",
+              "inverse-surface": "#2e3132",
+              "primary-fixed": "#d6e3ff",
+              "on-error-container": "#93000a"
+            },
+            fontFamily: {
+              "montserrat": ["Montserrat", "sans-serif"],
+              "inter": ["Inter", "sans-serif"],
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.5rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .kanban-column {
+        min-width: 320px;
+        width: 320px;
+      }
+      .custom-scrollbar::-webkit-scrollbar {
+        height: 8px;
+        width: 8px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #e2e8f0;
+        border-radius: 10px;
+      }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-inter antialiased overflow-x-hidden">
+<!-- TopNavBar -->
+<header class="fixed top-0 left-0 w-full flex justify-between items-center px-6 py-3 bg-white/80 dark:bg-slate-900/80 backdrop-blur-lg z-50 border-b border-slate-100 dark:border-slate-800 shadow-sm dark:shadow-none">
+<div class="flex items-center gap-8">
+<span class="font-montserrat font-black text-2xl tracking-tight text-[#0B3D5E] dark:text-blue-200">Gynmed</span>
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-[#1271D8] font-bold border-b-2 border-[#1271D8] pb-1 font-inter text-sm" href="#">Gerenciamento</a>
+<a class="text-slate-500 dark:text-slate-400 font-medium hover:text-[#0B3D5E] dark:hover:text-blue-300 transition-all duration-200 rounded-lg font-inter text-sm" href="#">Relatórios</a>
+<a class="text-slate-500 dark:text-slate-400 font-medium hover:text-[#0B3D5E] dark:hover:text-blue-300 transition-all duration-200 rounded-lg font-inter text-sm" href="#">Configurações</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative hidden lg:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
+<input class="pl-10 pr-4 py-2 bg-surface-container-low border-none rounded-full text-sm w-64 focus:ring-2 focus:ring-primary-container/20" placeholder="Buscar solicitação..." type="text"/>
+</div>
+<button class="p-2 text-slate-500 hover:bg-slate-50 rounded-lg transition-all"><span class="material-symbols-outlined" data-icon="notifications">notifications</span></button>
+<button class="p-2 text-slate-500 hover:bg-slate-50 rounded-lg transition-all"><span class="material-symbols-outlined" data-icon="account_circle">account_circle</span></button>
+<button class="p-2 text-slate-500 hover:bg-slate-50 rounded-lg transition-all"><span class="material-symbols-outlined" data-icon="logout">logout</span></button>
+</div>
+</header>
+<!-- SideNavBar (Suppressed for this layout per shell visibility rule, but used for alignment logic) -->
+<main class="pt-24 pb-12 px-6 max-w-[1600px] mx-auto">
+<!-- Dashboard Header -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
+<div>
+<nav class="flex items-center gap-2 text-xs text-slate-400 mb-2 font-medium uppercase tracking-wider">
+<span>Painel</span>
+<span class="material-symbols-outlined text-sm">chevron_right</span>
+<span class="text-primary font-bold">Gerenciamento</span>
+</nav>
+<h1 class="font-montserrat font-bold text-3xl text-[#0B3D5E] tracking-tight">Gerenciamento de Solicitações (Kanban)</h1>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex bg-surface-container p-1 rounded-xl">
+<button class="px-4 py-2 rounded-lg text-sm font-semibold text-slate-500 hover:bg-white transition-all">Tabela</button>
+<button class="px-4 py-2 rounded-lg text-sm font-semibold bg-white text-primary shadow-sm transition-all">Kanban</button>
+</div>
+<button class="flex items-center gap-2 bg-primary-container text-white px-5 py-2.5 rounded-xl font-semibold shadow-lg shadow-primary-container/20 hover:scale-[1.02] active:scale-95 transition-all">
+<span class="material-symbols-outlined text-lg" data-icon="add">add</span>
+<span>Novo Atendimento</span>
+</button>
+</div>
+</div>
+<!-- Filter Bar -->
+<div class="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-outline-variant/10 flex flex-wrap items-center gap-6 mb-8">
+<div class="flex flex-col gap-1.5 min-w-[200px]">
+<label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Paciente</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">person</span>
+<input class="w-full pl-10 pr-4 py-2 bg-surface-container-low border-none rounded-lg text-sm focus:ring-1 focus:ring-primary" placeholder="Nome do paciente" type="text"/>
+</div>
+</div>
+<div class="flex flex-col gap-1.5 min-w-[200px]">
+<label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Médico Responsável</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">medical_services</span>
+<input class="w-full pl-10 pr-4 py-2 bg-surface-container-low border-none rounded-lg text-sm focus:ring-1 focus:ring-primary" placeholder="Dr. Nome" type="text"/>
+</div>
+</div>
+<div class="flex flex-col gap-1.5 min-w-[180px]">
+<label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Data</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">calendar_today</span>
+<input class="w-full pl-10 pr-4 py-2 bg-surface-container-low border-none rounded-lg text-sm focus:ring-1 focus:ring-primary" type="date"/>
+</div>
+</div>
+<div class="flex items-end h-full pt-5">
+<button class="flex items-center gap-2 px-6 py-2 bg-slate-100 text-slate-600 font-semibold rounded-lg hover:bg-slate-200 transition-colors text-sm">
+<span class="material-symbols-outlined text-lg">filter_alt</span>
+                    Limpar Filtros
+                </button>
+</div>
+</div>
+<!-- Kanban Board -->
+<div class="flex gap-6 overflow-x-auto pb-6 custom-scrollbar items-start">
+<!-- Column 1: Solicitado (orçamento) -->
+<div class="kanban-column flex flex-col gap-4">
+<div class="flex items-center justify-between px-2 mb-2">
+<h3 class="font-montserrat font-bold text-sm text-slate-600 uppercase tracking-wider flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-blue-400"></span>
+                        Solicitado (orçamento)
+                    </h3>
+<span class="bg-slate-200 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-full">02</span>
+</div>
+<!-- Card -->
+<div class="bg-surface-container-lowest p-5 rounded-2xl shadow-sm hover:shadow-md transition-all border border-transparent hover:border-primary-container/20 group cursor-pointer">
+<div class="flex justify-between items-start mb-4">
+<span class="font-montserrat font-bold text-primary text-sm">#10245</span>
+<span class="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-lg uppercase tracking-tight">Em Análise</span>
+</div>
+<div class="space-y-3 mb-6">
+<div>
+<p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-0.5">Paciente</p>
+<p class="text-sm font-semibold text-on-surface">Mariana Silva Oliveira</p>
+</div>
+<div>
+<p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-0.5">Médico</p>
+<p class="text-sm font-medium text-slate-600">Dr. Ricardo Mendonça</p>
+</div>
+<div>
+<p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-0.5">Procedimento</p>
+<p class="text-sm font-medium text-slate-600">Histeroscopia Cirúrgica</p>
+</div>
+<div class="flex items-center gap-2 pt-1">
+<span class="material-symbols-outlined text-slate-300 text-lg">event_note</span>
+<span class="text-xs text-slate-500">Solicitado em: 12 Out 2023</span>
+</div>
+</div>
+<div class="flex items-center justify-end gap-2 border-t border-slate-50 pt-4">
+<button class="p-1.5 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors" title="Ver Detalhes">
+<span class="material-symbols-outlined text-xl" data-icon="visibility">visibility</span>
+</button>
+<button class="p-1.5 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors" title="Aprovar">
+<span class="material-symbols-outlined text-xl" data-icon="check_circle">check_circle</span>
+</button>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-5 rounded-2xl shadow-sm hover:shadow-md transition-all border border-transparent hover:border-primary-container/20 group cursor-pointer">
+<div class="flex justify-between items-start mb-4">
+<span class="font-montserrat font-bold text-primary text-sm">#10248</span>
+<span class="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-lg uppercase tracking-tight">Aguardando Docs</span>
+</div>
+<div class="space-y-3 mb-6">
+<div>
+<p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-0.5">Paciente</p>
+<p class="text-sm font-semibold text-on-surface">Beatriz Costa Lima</p>
+</div>
+<div>
+<p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-0.5">Médico</p>
+<p class="text-sm font-medium text-slate-600">Dra. Aline Santos</p>
+</div>
+<div>
+<p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-0.5">Procedimento</p>
+<p class="text-sm font-medium text-slate-600">Mioectomia Laparoscópica</p>
+</div>
+<div class="flex items-center gap-2 pt-1">
+<span class="material-symbols-outlined text-slate-300 text-lg">event_note</span>
+<span class="text-xs text-slate-500">Solicitado em: 14 Out 2023</span>
+</div>
+</div>
+<div class="flex items-center justify-end gap-2 border-t border-slate-50 pt-4">
+<button class="p-1.5 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors"><span class="material-symbols-outlined text-xl" data-icon="visibility">visibility</span></button>
+<button class="p-1.5 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors"><span class="material-symbols-outlined text-xl" data-icon="check_circle">check_circle</span></button>
+</div>
+</div>
+</div>
+<!-- Column 2: Protocolado -->
+<div class="kanban-column flex flex-col gap-4">
+<div class="flex items-center justify-between px-2 mb-2">
+<h3 class="font-montserrat font-bold text-sm text-slate-600 uppercase tracking-wider flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                        Protocolado
+                    </h3>
+<span class="bg-slate-200 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-full">03</span>
+</div>
+<!-- Card Divergência -->
+<div class="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border-l-4 border-l-error/40 border border-transparent hover:border-error/20 cursor-pointer">
+<div class="flex justify-between items-start mb-4">
+<span class="font-montserrat font-bold text-primary text-sm">#10192</span>
+<span class="text-[10px] font-bold text-error bg-error-container px-2 py-1 rounded-lg uppercase tracking-tight">Divergência</span>
+</div>
+<div class="space-y-3 mb-6">
+<p class="text-sm font-semibold text-on-surface">Fernanda Alencar</p>
+<p class="text-sm font-medium text-slate-600">Dra. Claudia Neves</p>
+<p class="text-sm font-medium text-slate-600">Endometriose Profunda</p>
+</div>
+<div class="flex items-center justify-end gap-2 border-t border-slate-50 pt-4">
+<button class="p-1.5 text-slate-400 hover:text-primary rounded-lg transition-colors"><span class="material-symbols-outlined text-xl" data-icon="visibility">visibility</span></button>
+<button class="px-3 py-1 bg-primary/5 text-primary text-xs font-bold rounded-lg hover:bg-primary/10">Resolver</button>
+</div>
+</div>
+<!-- Card Em Junta Médica -->
+<div class="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-transparent hover:border-amber-400/20 cursor-pointer">
+<div class="flex justify-between items-start mb-4">
+<span class="font-montserrat font-bold text-primary text-sm">#10211</span>
+<span class="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-lg uppercase tracking-tight">Em Junta Médica</span>
+</div>
+<div class="space-y-3 mb-6">
+<p class="text-sm font-semibold text-on-surface">Letícia Ramos</p>
+<p class="text-sm font-medium text-slate-600">Dr. Paulo Vieira</p>
+<p class="text-sm font-medium text-slate-600">Laparoscopia Diagnóstica</p>
+</div>
+<div class="flex items-center justify-end gap-2 border-t border-slate-50 pt-4">
+<button class="p-1.5 text-slate-400 hover:text-primary rounded-lg transition-colors"><span class="material-symbols-outlined text-xl" data-icon="visibility">visibility</span></button>
+</div>
+</div>
+<!-- Card Defesa Enviada -->
+<div class="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-transparent hover:border-primary-container/20 cursor-pointer">
+<div class="flex justify-between items-start mb-4">
+<span class="font-montserrat font-bold text-primary text-sm">#10224</span>
+<span class="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-lg uppercase tracking-tight">Defesa Enviada</span>
+</div>
+<div class="space-y-3 mb-6">
+<p class="text-sm font-semibold text-on-surface">Camila Torres</p>
+<p class="text-sm font-medium text-slate-600">Dr. Ricardo Mendonça</p>
+<p class="text-sm font-medium text-slate-600">Salpingectomia</p>
+</div>
+</div>
+</div>
+<!-- Column 3: Autorizado -->
+<div class="kanban-column flex flex-col gap-4">
+<div class="flex items-center justify-between px-2 mb-2">
+<h3 class="font-montserrat font-bold text-sm text-slate-600 uppercase tracking-wider flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-teal-400"></span>
+                        Autorizado
+                    </h3>
+<span class="bg-slate-200 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-full">01</span>
+</div>
+<!-- Card Pendência de Agendamento -->
+<div class="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-transparent hover:border-teal-400/20 cursor-pointer">
+<div class="flex justify-between items-start mb-4">
+<span class="font-montserrat font-bold text-primary text-sm">#10155</span>
+<span class="text-[10px] font-bold text-teal-600 bg-teal-50 px-2 py-1 rounded-lg uppercase tracking-tight">Pendência de Agendamento</span>
+</div>
+<div class="space-y-3 mb-6">
+<p class="text-sm font-semibold text-on-surface">Juliana Paes</p>
+<p class="text-sm font-medium text-slate-600">Dra. Aline Santos</p>
+<p class="text-sm font-medium text-slate-600">Ooforectomia Unilateral</p>
+</div>
+<div class="flex items-center justify-end gap-2 border-t border-slate-50 pt-4">
+<button class="p-1.5 text-slate-400 hover:text-primary rounded-lg transition-colors"><span class="material-symbols-outlined text-xl" data-icon="visibility">visibility</span></button>
+<button class="flex items-center gap-1.5 px-4 py-1.5 bg-teal-500 text-white text-xs font-bold rounded-lg hover:bg-teal-600 transition-colors shadow-sm shadow-teal-500/10">
+<span class="material-symbols-outlined text-sm" data-icon="calendar_month">calendar_month</span>
+                            Agendar
+                        </button>
+</div>
+</div>
+</div>
+<!-- Column 4: Agendado -->
+<div class="kanban-column flex flex-col gap-4">
+<div class="flex items-center justify-between px-2 mb-2">
+<h3 class="font-montserrat font-bold text-sm text-slate-600 uppercase tracking-wider flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary-container"></span>
+                        Agendado
+                    </h3>
+<span class="bg-slate-200 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-full">01</span>
+</div>
+<!-- Card Cirurgia Agendada -->
+<div class="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border-l-4 border-l-primary-container/60 border border-transparent hover:border-primary-container/20 cursor-pointer">
+<div class="flex justify-between items-start mb-4">
+<span class="font-montserrat font-bold text-primary text-sm">#09877</span>
+<div class="flex items-center gap-1 bg-primary-container/10 px-2 py-1 rounded-lg">
+<span class="material-symbols-outlined text-xs text-primary-container" style="font-variation-settings: 'FILL' 1;">calendar_today</span>
+<span class="text-[10px] font-bold text-primary-container uppercase tracking-tight">Cirurgia Agendada</span>
+</div>
+</div>
+<div class="space-y-3 mb-6">
+<p class="text-sm font-semibold text-on-surface">Priscila Gomes</p>
+<p class="text-sm font-medium text-slate-600">Dr. Ricardo Mendonça</p>
+<p class="text-sm font-medium text-slate-600">Tratamento de Endometriose</p>
+<div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-primary-container shadow-sm">
+<span class="material-symbols-outlined text-lg">event</span>
+</div>
+<div>
+<p class="text-[10px] font-bold text-slate-400 uppercase leading-none">Data Prevista</p>
+<p class="text-xs font-bold text-slate-700">25 Out 2023 • 08:30</p>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-end gap-2 border-t border-slate-50 pt-4">
+<button class="p-1.5 text-slate-400 hover:text-primary rounded-lg transition-colors"><span class="material-symbols-outlined text-xl" data-icon="visibility">visibility</span></button>
+<button class="p-1.5 text-slate-400 hover:text-primary rounded-lg transition-colors"><span class="material-symbols-outlined text-xl" data-icon="edit_calendar">edit_calendar</span></button>
+</div>
+</div>
+</div>
+<!-- Column 5: Cirurgia Realizada -->
+<div class="kanban-column flex flex-col gap-4">
+<div class="flex items-center justify-between px-2 mb-2">
+<h3 class="font-montserrat font-bold text-sm text-slate-600 uppercase tracking-wider flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-tertiary-container"></span>
+                        Cirurgia Realizada
+                    </h3>
+<span class="bg-slate-200 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-full">01</span>
+</div>
+<!-- Card Realizada -->
+<div class="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-transparent hover:border-tertiary-container/20 cursor-pointer opacity-90 hover:opacity-100 transition-opacity">
+<div class="flex justify-between items-start mb-4">
+<span class="font-montserrat font-bold text-primary text-sm">#09552</span>
+<span class="text-[10px] font-bold text-white bg-tertiary-container px-2 py-1 rounded-lg uppercase tracking-tight">Realizada</span>
+</div>
+<div class="space-y-3 mb-6">
+<p class="text-sm font-semibold text-on-surface">Sofia Helena Martins</p>
+<p class="text-sm font-medium text-slate-600">Dra. Claudia Neves</p>
+<p class="text-sm font-medium text-slate-600">Curetagem Uterina</p>
+</div>
+<div class="flex items-center justify-end gap-2 border-t border-slate-50 pt-4">
+<button class="flex items-center gap-1.5 px-4 py-1.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-200 transition-colors">
+<span class="material-symbols-outlined text-sm">clinical_notes</span>
+                            Prontuário
+                        </button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="w-full mt-auto flex flex-col md:flex-row justify-between items-center px-8 py-8 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 gap-4">
+<div class="flex items-center gap-2">
+<span class="text-[#0B3D5E] font-bold font-inter text-xs uppercase tracking-widest">Gynmed Digital Experience</span>
+<span class="text-slate-300">|</span>
+<p class="text-slate-400 font-inter text-xs uppercase tracking-widest">© 2024. Todos os direitos reservados.</p>
+</div>
+<div class="flex items-center gap-6">
+<a class="text-slate-400 hover:text-[#0B3D5E] font-inter text-xs uppercase tracking-widest transition-all underline-offset-4 hover:underline" href="#">Privacidade</a>
+<a class="text-slate-400 hover:text-[#0B3D5E] font-inter text-xs uppercase tracking-widest transition-all underline-offset-4 hover:underline" href="#">Termos de Uso</a>
+<a class="text-slate-400 hover:text-[#0B3D5E] font-inter text-xs uppercase tracking-widest transition-all underline-offset-4 hover:underline" href="#">Suporte</a>
+</div>
+</footer>
+</body></html>

@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Configurações do Sistema - Gynmed Digital</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&amp;family=Inter:wght@300;400;500;600&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container": "#edeeef",
+              "outline-variant": "#c1c6d5",
+              "outline": "#727784",
+              "surface-tint": "#005db7",
+              "on-tertiary-fixed": "#002019",
+              "on-error": "#ffffff",
+              "tertiary-fixed": "#76f9d9",
+              "surface-variant": "#e1e3e4",
+              "secondary-fixed": "#cde5ff",
+              "on-primary-fixed-variant": "#00468c",
+              "secondary-fixed-dim": "#a2cbf3",
+              "error-container": "#ffdad6",
+              "tertiary-container": "#00816b",
+              "tertiary-fixed-dim": "#56dcbd",
+              "primary-fixed": "#d6e3ff",
+              "surface": "#f8f9fa",
+              "tertiary": "#006654",
+              "on-tertiary-fixed-variant": "#005142",
+              "surface-container-highest": "#e1e3e4",
+              "inverse-surface": "#2e3132",
+              "primary-fixed-dim": "#a9c7ff",
+              "on-tertiary-container": "#e1fff4",
+              "on-background": "#191c1d",
+              "background": "#f8f9fa",
+              "on-secondary": "#ffffff",
+              "on-tertiary": "#ffffff",
+              "on-secondary-container": "#345d80",
+              "surface-container-lowest": "#ffffff",
+              "surface-bright": "#f8f9fa",
+              "primary-container": "#1271d8",
+              "inverse-primary": "#a9c7ff",
+              "on-surface": "#191c1d",
+              "on-secondary-fixed": "#001d32",
+              "error": "#ba1a1a",
+              "surface-dim": "#d9dadb",
+              "inverse-on-surface": "#f0f1f2",
+              "on-surface-variant": "#414753",
+              "on-primary-fixed": "#001b3d",
+              "on-error-container": "#93000a",
+              "secondary-container": "#add6fe",
+              "secondary": "#396285",
+              "primary": "#0059af",
+              "on-secondary-fixed-variant": "#1e4a6c",
+              "on-primary": "#ffffff",
+              "surface-container-low": "#f3f4f5",
+              "surface-container-high": "#e7e8e9",
+              "on-primary-container": "#f8f8ff"
+            },
+            fontFamily: {
+              "headline": ["Montserrat"],
+              "body": ["Inter"],
+              "label": ["Inter"],
+              "brand": ["Montserrat"]
+            },
+            borderRadius: {"DEFAULT": "0.5rem", "lg": "0.75rem", "xl": "1rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        h1, h2, h3 {
+            font-family: 'Montserrat', sans-serif;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-background min-h-screen">
+<!-- TopNavBar -->
+<header class="fixed top-0 w-full z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md shadow-sm shadow-blue-900/5 border-b border-slate-200/50 flex justify-between items-center px-6 py-3 w-full">
+<div class="flex items-center gap-4">
+<span class="text-xl font-bold tracking-tight text-blue-900 font-brand">Gynmed</span>
+</div>
+<div class="flex items-center gap-6">
+<div class="hidden md:flex items-center gap-2 bg-surface-container-low px-4 py-2 rounded-full border border-outline-variant/10">
+<span class="material-symbols-outlined text-slate-400 text-lg">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-sm w-64 font-body" placeholder="Buscar pacientes..." type="text"/>
+</div>
+<div class="flex items-center gap-3">
+<button class="p-2 text-slate-500 hover:bg-slate-50 rounded-full transition-colors relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full border-2 border-white"></span>
+</button>
+<button class="p-2 text-slate-500 hover:bg-slate-50 rounded-full transition-colors">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+<div class="h-8 w-px bg-slate-200 mx-2"></div>
+<div class="flex items-center gap-3">
+<div class="text-right hidden sm:block">
+<p class="text-xs font-bold text-blue-900">Dra. Mariana Silva</p>
+<p class="text-[10px] text-slate-500">Ginecologista</p>
+</div>
+<img alt="User profile avatar" class="w-10 h-10 rounded-full object-cover border-2 border-primary-container/20" data-alt="Professional portrait of a female doctor in a white coat, soft clinical lighting, confident and friendly expression" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDxOgEJfhzXtLbKuEiTZNQU_l4qO6EGQtHKLVUoxkc2bnjoducnvqNBL0YrPGKpgyggJsqf1RCWMrdJWvB-olPexF1tc4dHKal3gJJYNUjM6BKcVVYSH3C7HxmHMXp_S5jOHFKYDoaNo6igYrD_h2sORKVO-igF7l0kJpV7onaAvAjgj-59r7cv4TB-YX1PWotJHyVUzd1JMgHff_zLR2NzMxzJalGmpPzeamrx8Bit9KQAX4k-DO_fxpKU4A9b9PqLVL89MSXJ4eWV"/>
+</div>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="h-screen w-64 fixed left-0 top-0 overflow-y-auto bg-slate-50 dark:bg-slate-950 flex flex-col gap-2 p-4 border-r border-slate-200 hidden md:flex pt-20">
+<div class="mb-6 px-4">
+<h2 class="font-montserrat font-black text-blue-900 text-lg uppercase tracking-wider">Gynmed Digital</h2>
+<p class="text-[10px] font-inter font-medium text-slate-400 uppercase tracking-[0.2em]">Precision Care</p>
+</div>
+<nav class="flex flex-col gap-1 flex-1">
+<a class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200 ease-in-out rounded-lg" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-inter font-medium text-xs">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200 ease-in-out rounded-lg" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="font-inter font-medium text-xs">Patients</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200 ease-in-out rounded-lg" href="#">
+<span class="material-symbols-outlined">calendar_today</span>
+<span class="font-inter font-medium text-xs">Schedules</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200 ease-in-out rounded-lg" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-inter font-medium text-xs">Reports</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-blue-700 bg-white rounded-lg font-bold shadow-sm" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-inter font-medium text-xs">Settings</span>
+</a>
+</nav>
+<button class="mt-auto mb-4 mx-2 bg-primary-container text-white py-3 px-4 rounded-lg flex items-center justify-center gap-2 font-inter font-bold text-xs shadow-sm hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined text-sm">add</span>
+            New Consultation
+        </button>
+</aside>
+<!-- Main Content -->
+<main class="md:ml-64 pt-24 px-6 pb-12 min-h-screen">
+<div class="max-w-6xl mx-auto">
+<header class="mb-10">
+<h1 class="text-3xl font-extrabold text-blue-900 tracking-tight mb-2">Configurações do Sistema</h1>
+<p class="text-slate-500 font-body">Gerencie suas preferências pessoais e configurações de conta.</p>
+</header>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+<!-- Vertical Tabs Section -->
+<aside class="lg:col-span-3">
+<nav class="flex flex-col gap-2 p-2 bg-surface-container-low rounded-xl border border-outline-variant/10">
+<button class="flex items-center gap-3 px-4 py-3 bg-white text-primary rounded-lg font-semibold shadow-sm text-sm text-left transition-all">
+<span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">person</span>
+                            Perfil do Usuário
+                        </button>
+<button class="flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-white/50 rounded-lg text-sm text-left transition-all">
+<span class="material-symbols-outlined text-xl">notifications</span>
+                            Notificações
+                        </button>
+<button class="flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-white/50 rounded-lg text-sm text-left transition-all">
+<span class="material-symbols-outlined text-xl">security</span>
+                            Segurança
+                        </button>
+<button class="flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-white/50 rounded-lg text-sm text-left transition-all">
+<span class="material-symbols-outlined text-xl">hub</span>
+                            Integrações
+                        </button>
+</nav>
+<div class="mt-8 p-6 rounded-xl bg-primary-container text-white relative overflow-hidden shadow-lg">
+<div class="relative z-10">
+<h3 class="font-bold text-lg mb-2">Suporte Gynmed</h3>
+<p class="text-xs opacity-90 leading-relaxed mb-4">Precisa de ajuda com as configurações avançadas da clínica?</p>
+<button class="bg-white text-primary text-[10px] font-bold py-2 px-4 rounded-full uppercase tracking-wider">Falar com Consultor</button>
+</div>
+<div class="absolute -right-4 -bottom-4 opacity-10">
+<span class="material-symbols-outlined text-8xl">contact_support</span>
+</div>
+</div>
+</aside>
+<!-- Profile Content Area -->
+<section class="lg:col-span-9 space-y-8">
+<!-- Profile Card -->
+<div class="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/5 overflow-hidden">
+<div class="p-8 border-b border-slate-100 flex flex-col md:flex-row items-center gap-8">
+<div class="relative group">
+<div class="w-28 h-28 rounded-full overflow-hidden border-4 border-slate-50 shadow-inner">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="Close up of a professional female doctor smiling, wearing a stethoscope, clinical studio background with soft lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDJqU_PJoORYZzMKS82VAMJq4b8W-Dsa6CPfkv5KPw0RNfIFhGNR9DKvr4a3dQfociB4r2Rr38Wjw1JNC4MNyQuSvkOYmgK9ar_zu6JSP288Lj2Lc4D-5cpiVJWaI-vwOTiV9UUS5ngBrazKvRK_qLFD2HOso3H31kgrjIRu9DQ35Xm5QMRg-tnjK5L62KvwjkYO3RIS40rNlogLulta-fxF77NesfOTxRQwXBePO7S6arFdZydyUMMe_ttXjJQsobM9Wwy4mpyP5K6"/>
+</div>
+<button class="absolute bottom-0 right-0 bg-primary-container text-white p-2 rounded-full shadow-lg hover:scale-105 transition-transform flex items-center justify-center">
+<span class="material-symbols-outlined text-lg">photo_camera</span>
+</button>
+</div>
+<div class="text-center md:text-left flex-1">
+<h2 class="text-2xl font-bold text-blue-900 mb-1">Perfil Profissional</h2>
+<p class="text-slate-400 text-sm mb-4 font-body">As informações abaixo serão exibidas em seus laudos e receitas.</p>
+<div class="flex flex-wrap gap-2 justify-center md:justify-start">
+<span class="bg-tertiary-container/10 text-tertiary px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">Verificado</span>
+<span class="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">Premium Access</span>
+</div>
+</div>
+</div>
+<div class="p-8">
+<form class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+<div class="space-y-2">
+<label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Nome Completo</label>
+<input class="w-full bg-surface-container-low border-outline-variant/20 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary-container/20 focus:border-primary-container transition-all" type="text" value="Dra. Mariana Silva Ferreira"/>
+</div>
+<div class="space-y-2">
+<label class="text-xs font-bold text-slate-500 uppercase tracking-wide">E-mail Profissional</label>
+<input class="w-full bg-surface-container-low border-outline-variant/20 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary-container/20 focus:border-primary-container transition-all" type="email" value="mariana.silva@gynmed.com.br"/>
+</div>
+<div class="space-y-2">
+<label class="text-xs font-bold text-slate-500 uppercase tracking-wide">CRM/Registro</label>
+<input class="w-full bg-surface-container-low border-outline-variant/20 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary-container/20 focus:border-primary-container transition-all" type="text" value="CRM-SP 123456"/>
+</div>
+<div class="space-y-2">
+<label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Especialidade</label>
+<select class="w-full bg-surface-container-low border-outline-variant/20 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary-container/20 focus:border-primary-container transition-all appearance-none">
+<option selected="">Ginecologia e Obstetrícia</option>
+<option>Mastologia</option>
+<option>Endocrinologia Ginecológica</option>
+<option>Reprodução Humana</option>
+</select>
+</div>
+<div class="md:col-span-2 pt-6 border-t border-slate-100 flex justify-end gap-4">
+<button class="px-6 py-2.5 text-slate-500 text-sm font-semibold hover:bg-slate-50 rounded-lg transition-colors" type="button">Descartar</button>
+<button class="bg-primary-container text-white px-8 py-2.5 rounded-lg text-sm font-bold shadow-sm hover:brightness-110 active:scale-95 transition-all" type="submit">Salvar Alterações</button>
+</div>
+</form>
+</div>
+</div>
+<!-- System Preferences -->
+<div class="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/5 p-8">
+<h3 class="text-xl font-bold text-blue-900 mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined">tune</span>
+                            Preferências do Sistema
+                        </h3>
+<div class="space-y-6 max-w-2xl">
+<div class="flex items-center justify-between p-4 bg-surface rounded-xl">
+<div>
+<p class="font-bold text-slate-800 text-sm">Tema Visual</p>
+<p class="text-xs text-slate-500">Escolha como a interface deve ser exibida.</p>
+</div>
+<div class="flex bg-surface-container-high p-1 rounded-lg">
+<button class="px-4 py-1.5 bg-white shadow-sm rounded-md text-xs font-bold text-primary flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">light_mode</span>
+                                        Claro
+                                    </button>
+<button class="px-4 py-1.5 text-slate-500 text-xs font-bold flex items-center gap-2 hover:text-slate-700">
+<span class="material-symbols-outlined text-sm">dark_mode</span>
+                                        Escuro
+                                    </button>
+</div>
+</div>
+<div class="flex items-center justify-between p-4 bg-surface rounded-xl">
+<div>
+<p class="font-bold text-slate-800 text-sm">Idioma</p>
+<p class="text-xs text-slate-500">Defina o idioma das ferramentas clínicas.</p>
+</div>
+<select class="bg-white border-outline-variant/20 rounded-lg text-xs font-bold text-slate-700 px-4 py-2 pr-10">
+<option selected="">Português (Brasil)</option>
+<option>English (US)</option>
+<option>Español</option>
+</select>
+</div>
+<div class="flex items-center justify-between p-4 bg-surface rounded-xl">
+<div>
+<p class="font-bold text-slate-800 text-sm">Auto-Save de Prontuários</p>
+<p class="text-xs text-slate-500">Salva automaticamente a cada 2 minutos.</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</div>
+</div>
+</div>
+<!-- Advanced Card Bento Grid Element -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="p-6 bg-slate-900 text-white rounded-2xl flex items-center justify-between group cursor-pointer overflow-hidden relative">
+<div class="relative z-10">
+<span class="text-primary-container font-bold text-[10px] uppercase tracking-widest mb-2 block">Assinatura</span>
+<h4 class="font-bold text-lg mb-1">Gynmed Pro Annual</h4>
+<p class="text-slate-400 text-xs">Vence em 15 de Dezembro, 2024</p>
+<button class="mt-4 flex items-center gap-2 text-xs font-bold text-white group-hover:gap-3 transition-all">
+                                    Gerenciar Plano
+                                    <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+<span class="material-symbols-outlined text-6xl text-white/5 absolute -right-4 -bottom-4 group-hover:scale-110 transition-transform">workspace_premium</span>
+</div>
+<div class="p-6 bg-white border border-outline-variant/20 rounded-2xl flex items-center justify-between group cursor-pointer shadow-sm">
+<div>
+<span class="text-error font-bold text-[10px] uppercase tracking-widest mb-2 block">Segurança Crítica</span>
+<h4 class="font-bold text-lg text-slate-900 mb-1">Backup na Nuvem</h4>
+<p class="text-slate-500 text-xs">Último backup: Hoje, 08:45 AM</p>
+<button class="mt-4 flex items-center gap-2 text-xs font-bold text-primary group-hover:gap-3 transition-all">
+                                    Forçar Sincronização
+                                    <span class="material-symbols-outlined text-sm">sync</span>
+</button>
+</div>
+<div class="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-primary-container">
+<span class="material-symbols-outlined text-3xl">cloud_done</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-lg border-t border-slate-100 flex justify-around py-3 px-2 z-50">
+<button class="flex flex-col items-center gap-1 text-slate-400">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-[10px] font-medium">Início</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-slate-400">
+<span class="material-symbols-outlined">person</span>
+<span class="text-[10px] font-medium">Pacientes</span>
+</button>
+<button class="flex flex-col items-center gap-1 bg-primary-container text-white p-2 -mt-8 rounded-full shadow-lg shadow-primary-container/30">
+<span class="material-symbols-outlined">add</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-slate-400">
+<span class="material-symbols-outlined">calendar_today</span>
+<span class="text-[10px] font-medium">Agenda</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">settings</span>
+<span class="text-[10px] font-bold">Ajustes</span>
+</button>
+</nav>
+</body></html>
