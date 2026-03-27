@@ -94,10 +94,10 @@ function KanbanCard({ sol, index, onOpenDetails }: { sol: Solicitacao; index: nu
             )}
           </div>
 
-          <div className="space-y-3 mb-6">
+          <div className="space-y-3">
             <div>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-0.5">Paciente</p>
-              <button 
+              <button
                 onClick={() => onOpenDetails(sol.id)}
                 className="text-sm font-semibold text-on-surface hover:text-primary transition-colors text-left focus:outline-none"
               >
@@ -151,11 +151,11 @@ export default function SolicitacoesKanban({ initialSolicitacoes, onOpenDetails 
     const grouped: Record<string, Solicitacao[]> = {
       solicitado: [], protocolado: [], autorizado: [], agendado: [], realizada: []
     };
-    
+
     columns.forEach((col) => {
       grouped[col.id] = (initialSolicitacoes as unknown as Solicitacao[]).filter((s) => col.statuses.includes(s.status_atual as string));
     });
-    
+
     setBoardData(grouped);
   }, [initialSolicitacoes]);
 
@@ -192,7 +192,7 @@ export default function SolicitacoesKanban({ initialSolicitacoes, onOpenDetails 
       .from("solicitacoes_cirurgia")
       .update({ status_atual: newStatus })
       .eq("id", moved.id);
-      
+
     // Log history
     if (previousStatus !== newStatus) {
       await supabase

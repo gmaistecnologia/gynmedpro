@@ -1,8 +1,35 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 export default function LoginPage() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+
+    const { error: loginError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (loginError) {
+      setError(loginError.message);
+      setLoading(false);
+      return;
+    }
+
+    window.location.href = "/solicitacoes";
+  };
+
   return (
     <div className="bg-surface font-body text-on-surface min-h-screen flex items-center justify-center p-6 relative overflow-hidden">
       {/* Background Abstract Shapes */}
@@ -26,13 +53,13 @@ export default function LoginPage() {
 
         {/* Login Card */}
         <div className="bg-surface-container-lowest elevation-ambient rounded-xl p-8 border border-outline-variant/10">
-          <form
-            className="space-y-6"
-            onSubmit={(e) => {
-              e.preventDefault();
-              window.location.href = "/solicitacoes";
-            }}
-          >
+          <form className="space-y-6" onSubmit={handleLogin}>
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg text-center font-medium">
+                {error}
+              </div>
+            )}
+
             {/* Email */}
             <div className="space-y-2">
               <label
@@ -53,6 +80,7 @@ export default function LoginPage() {
                   name="email"
                   placeholder="exemplo@gynmed.com.br"
                   type="email"
+                  required
                 />
               </div>
             </div>
@@ -77,35 +105,23 @@ export default function LoginPage() {
                   name="password"
                   placeholder="••••••••"
                   type="password"
+                  required
                 />
-                <button
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-outline hover:text-secondary transition-colors"
-                  type="button"
-                >
-                  <span className="material-symbols-outlined">visibility</span>
-                </button>
               </div>
-            </div>
-
-            {/* Forgot password */}
-            <div className="flex justify-end">
-              <a
-                className="text-sm font-semibold text-primary-container hover:underline underline-offset-4 transition-all"
-                href="#"
-              >
-                Esqueceu a senha?
-              </a>
             </div>
 
             {/* Submit */}
             <button
-              className="w-full py-4 bg-gradient-to-r from-primary-container to-primary text-white font-bold rounded-lg shadow-lg shadow-primary/20 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2"
+              disabled={loading}
+              className="w-full py-4 bg-gradient-to-r from-primary-container to-primary text-white font-bold rounded-lg shadow-lg shadow-primary/20 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
               type="submit"
             >
-              Entrar
-              <span className="material-symbols-outlined text-[20px]">
-                arrow_forward
-              </span>
+              {loading ? "Entrando..." : "Entrar"}
+              {!loading && (
+                <span className="material-symbols-outlined text-[20px]">
+                  arrow_forward
+                </span>
+              )}
             </button>
           </form>
 
@@ -120,22 +136,8 @@ export default function LoginPage() {
         {/* Support Info */}
         <div className="mt-8 flex flex-col md:flex-row justify-between items-center px-4 gap-4">
           <p className="text-xs text-on-surface-variant font-medium">
-            © 2024 Gynmed Digital Experience
+            © 2026 Gynmed Digital Experience
           </p>
-          <div className="flex gap-4">
-            <a
-              className="text-xs text-outline font-semibold hover:text-primary transition-colors"
-              href="#"
-            >
-              Suporte Técnico
-            </a>
-            <a
-              className="text-xs text-outline font-semibold hover:text-primary transition-colors"
-              href="#"
-            >
-              Privacidade
-            </a>
-          </div>
         </div>
       </main>
 

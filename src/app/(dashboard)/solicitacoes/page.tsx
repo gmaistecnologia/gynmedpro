@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import SolicitacoesTable from "@/components/solicitacoes/SolicitacoesTable";
 import SolicitacoesKanban from "@/components/solicitacoes/SolicitacoesKanban";
 import SolicitacaoDetailsModal from "@/components/solicitacoes/SolicitacaoDetailsModal";
+import NovaSolicitacaoModal from "@/components/solicitacoes/NovaSolicitacaoModal";
 
 export default function SolicitacoesPage() {
   const [viewMode, setViewMode] = useState<"table" | "kanban">("table");
@@ -13,6 +14,7 @@ export default function SolicitacoesPage() {
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isNewRequestModalOpen, setIsNewRequestModalOpen] = useState(false);
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState("");
@@ -22,7 +24,18 @@ export default function SolicitacoesPage() {
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Fetch profile safely - handle missing role column
+      const { data: profile, error: profileError } = await supabase
+        .from("usuarios")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+
+      let query = supabase
         .from("solicitacoes_cirurgia")
         .select(`
           id,
@@ -36,8 +49,15 @@ export default function SolicitacoesPage() {
             plano_saude
           ),
           medicos!solicitacoes_cirurgia_medico_solicitante_id_fkey(nome)
-        `)
-        .order("criado_em", { ascending: false });
+        `);
+
+      // If we have a profile and specifically a 'representante' role, filter.
+      // If role column is missing (profileError), we default to Admin view (no filter).
+      if (profile?.role === "representante") {
+        query = query.eq("representante_responsavel_id", user.id);
+      }
+
+      const { data, error } = await query.order("criado_em", { ascending: false });
 
       if (data) {
         setSolicitacoes(data);
@@ -116,7 +136,10 @@ export default function SolicitacoesPage() {
               Kanban
             </button>
           </div>
-          <button className="flex items-center gap-2 bg-primary-container text-white px-5 py-2.5 rounded-xl font-semibold shadow-lg shadow-primary-container/20 hover:scale-[1.02] active:scale-95 transition-all">
+          <button 
+            onClick={() => setIsNewRequestModalOpen(true)}
+            className="flex items-center gap-2 bg-primary-container text-white px-5 py-2.5 rounded-xl font-semibold shadow-lg shadow-primary-container/20 hover:scale-[1.02] active:scale-95 transition-all"
+          >
             <span className="material-symbols-outlined text-lg">add</span>
             <span>Novo Atendimento</span>
           </button>
@@ -193,6 +216,15 @@ export default function SolicitacoesPage() {
           onClose={() => setIsModalOpen(false)}
         />
       )}
+
+      <NovaSolicitacaoModal 
+        isOpen={isNewRequestModalOpen}
+        onClose={() => setIsNewRequestModalOpen(false)}
+        onSuccess={() => {
+           // Refresh list
+           window.location.reload(); 
+        }}
+      />
     </>
   );
 }
