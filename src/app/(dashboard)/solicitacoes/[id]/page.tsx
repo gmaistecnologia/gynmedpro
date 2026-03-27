@@ -1,17 +1,68 @@
-"use client";
+import { supabase } from "@/lib/supabase";
+import { SolicitacaoStatus } from "@/components/ui/StatusBadge";
 
-import { mockDetalhe } from "@/lib/mock-data";
+export default async function DetalheSolicitacaoPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
 
-const steps = [
-  { label: "Solicitado", completed: true },
-  { label: "Protocolado", completed: true },
-  { label: "Autorizado", active: true },
-  { label: "Agendado", completed: false },
-  { label: "Realizada", completed: false },
-];
+  // Fetch solicitation with relationships
+  const { data: sol } = await supabase
+    .from("solicitacoes_cirurgia")
+    .select(`
+      *,
+      pacientes (*),
+      medico_solit:medicos!solicitacoes_cirurgia_medico_solicitante_id_fkey(*),
+      cirurgiao:medicos!solicitacoes_cirurgia_cirurgiao_principal_id_fkey(*),
+      hospitais (*),
+      usuarios!solicitacoes_cirurgia_representante_responsavel_id_fkey(nome_completo)
+    `)
+    .eq("id", id)
+    .single();
 
-export default function DetalheSolicitacaoPage() {
-  const sol = mockDetalhe;
+  if (!sol) {
+    return (
+      <div className="p-12 text-center text-slate-500">
+        <p className="text-lg font-semibold">Solicitação não encontrada.</p>
+        <p className="text-sm">O ID {id} não corresponde a um registro válido.</p>
+      </div>
+    );
+  }
+
+  // Fetch observations
+  const { data: observacoes } = await supabase
+    .from("historico_anotacoes")
+    .select("*, usuarios (nome_completo)")
+    .eq("solicitacao_id", id)
+    .order("criado_em", { ascending: true });
+
+  const obsList = observacoes || [];
+
+  // Determine active step for simplified linear path:
+  // 1: Solicitado -> 2: Protocolado -> 3: Autorizado -> 4: Agendado -> 5: Realizada
+  const statusGroupMap: Record<string, number> = {
+    solicitado: 0,
+    protocolado: 1, divergencia: 1, defesa: 1, junta_medica: 1, reiniciado: 1,
+    autorizado: 2, pendencia_agendamento: 2,
+    agendado: 3,
+    cirurgia_realizada: 4,
+  };
+  
+  const statusIndex = statusGroupMap[sol.status_atual] ?? 0;
+  const isFailed = ['negado', 'desistencia', 'cancelado'].includes(sol.status_atual);
+
+  const stepsDefinition = [
+    { id: "solicitado", label: "Solicitado" },
+    { id: "protocolado", label: "Protocolado" },
+    { id: "autorizado", label: "Autorizado" },
+    { id: "agendado", label: "Agendado" },
+    { id: "cirurgia_realizada", label: "Realizada" },
+  ];
+
+  const steps = stepsDefinition.map((s, idx) => ({
+    label: s.label,
+    completed: idx < statusIndex && !isFailed,
+    active: idx === statusIndex && !isFailed,
+    failed: isFailed && idx === statusIndex
+  }));
 
   return (
     <div className="pt-4 pb-12 flex flex-col md:flex-row gap-6 max-w-[1600px] mx-auto">
@@ -27,7 +78,7 @@ export default function DetalheSolicitacaoPage() {
                 <span>Detalhes</span>
               </nav>
               <h1 className="font-headline font-bold text-3xl text-secondary tracking-tight">
-                Solicitação #12345 - Detalhes
+                Solicitação {sol.numero_solicitacao || `#GYN-${sol.id.split('-')[0].toUpperCase()}`} - Detalhes
               </h1>
             </div>
             <div className="flex flex-col items-end gap-1">
@@ -37,7 +88,7 @@ export default function DetalheSolicitacaoPage() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-tertiary-container opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-tertiary-container" />
                 </span>
-                EM JUNTA MÉDICA
+                {sol.status_atual.replace(/_/g, " ").toUpperCase()}
               </div>
             </div>
           </div>
@@ -60,7 +111,7 @@ export default function DetalheSolicitacaoPage() {
                     {i + 1}
                   </div>
                 )}
-                <span className={`text-[11px] font-bold uppercase tracking-tight ${step.active ? "text-primary font-black" : step.completed ? "text-secondary" : "text-outline"}`}>
+                <span className={`text-[11px] font-bold uppercase tracking-tight ${step.active ? "text-primary font-black" : step.failed ? "text-error" : step.completed ? "text-secondary" : "text-outline"}`}>
                   {step.label}
                 </span>
               </div>
@@ -81,21 +132,25 @@ export default function DetalheSolicitacaoPage() {
             <div className="space-y-4">
               <div className="flex flex-col">
                 <label className="text-[10px] font-bold text-outline uppercase">ID da Solicitação</label>
-                <span className="text-sm font-semibold text-on-surface">{sol.codigo}</span>
+                <span className="text-sm font-semibold text-on-surface">{sol.numero_solicitacao || `#GYN-${sol.id.split('-')[0].toUpperCase()}`}</span>
               </div>
               <div className="flex flex-col">
                 <label className="text-[10px] font-bold text-outline uppercase">Data de Entrada</label>
-                <span className="text-sm font-semibold text-on-surface">{sol.dataSolicitacao}</span>
+                <span className="text-sm font-semibold text-on-surface">{new Date(sol.data_solicitacao).toLocaleDateString("pt-BR")}</span>
               </div>
               <div className="flex flex-col">
                 <label className="text-[10px] font-bold text-outline uppercase">Médico Solicitante</label>
-                <span className="text-sm font-semibold text-on-surface">{sol.medicoSolicitante}</span>
+                <span className="text-sm font-semibold text-on-surface">{sol.medico_solit?.nome || "Não Informado"}</span>
               </div>
               <div className="flex flex-col">
                 <label className="text-[10px] font-bold text-outline uppercase">Responsável Atual</label>
                 <div className="flex items-center gap-2 mt-1">
-                  <div className="w-6 h-6 rounded-full bg-secondary-container flex items-center justify-center text-[10px] font-bold text-on-secondary-container">AD</div>
-                  <span className="text-sm font-semibold text-on-surface">Admin Gynmed</span>
+                  <div className="w-6 h-6 rounded-full bg-secondary-container flex items-center justify-center text-[10px] font-bold text-on-secondary-container">
+                    {(sol.usuarios?.nome_completo || "S").substring(0, 2).toUpperCase()}
+                  </div>
+                  <span className="text-sm font-semibold text-on-surface">
+                    {sol.usuarios?.nome_completo || "Equipe de Auditoria"}
+                  </span>
                 </div>
               </div>
             </div>
@@ -112,25 +167,25 @@ export default function DetalheSolicitacaoPage() {
             <div className="space-y-4">
               <div className="flex flex-col">
                 <label className="text-[10px] font-bold text-outline uppercase">Nome Completo</label>
-                <span className="text-sm font-bold text-on-surface">{sol.paciente}</span>
+                <span className="text-sm font-bold text-on-surface">{sol.pacientes?.nome || "Não Informado"}</span>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col">
                   <label className="text-[10px] font-bold text-outline uppercase">CPF</label>
-                  <span className="text-sm font-semibold text-on-surface">{sol.cpf}</span>
+                  <span className="text-sm font-semibold text-on-surface">{sol.pacientes?.cpf || "Não Informado"}</span>
                 </div>
                 <div className="flex flex-col">
                   <label className="text-[10px] font-bold text-outline uppercase">Nascimento</label>
-                  <span className="text-sm font-semibold text-on-surface">{sol.nascimento}</span>
+                  <span className="text-sm font-semibold text-on-surface">{sol.pacientes?.data_nascimento ? new Date(sol.pacientes.data_nascimento).toLocaleDateString("pt-BR") : "Não Informado"}</span>
                 </div>
               </div>
               <div className="flex flex-col">
                 <label className="text-[10px] font-bold text-outline uppercase">Plano de Saúde</label>
-                <span className="text-sm font-semibold text-on-surface">{sol.planoSaude}</span>
+                <span className="text-sm font-semibold text-on-surface">{sol.pacientes?.plano_saude || "Não Informado"}</span>
               </div>
               <div className="flex flex-col">
                 <label className="text-[10px] font-bold text-outline uppercase">Telefone</label>
-                <span className="text-sm font-semibold text-on-surface">{sol.telefone}</span>
+                <span className="text-sm font-semibold text-on-surface">{sol.pacientes?.telefone || "Não Informado"}</span>
               </div>
             </div>
           </section>
@@ -146,19 +201,21 @@ export default function DetalheSolicitacaoPage() {
             <div className="space-y-4">
               <div className="flex flex-col">
                 <label className="text-[10px] font-bold text-outline uppercase">Tipo de Cirurgia</label>
-                <span className="text-sm font-bold text-on-surface">{sol.procedimento}</span>
+                <span className="text-sm font-bold text-on-surface">{sol.procedimento_descricao}</span>
               </div>
               <div className="flex flex-col">
                 <label className="text-[10px] font-bold text-outline uppercase">CID-10</label>
-                <span className="text-sm font-semibold text-on-surface">{sol.cid}</span>
+                <span className="text-sm font-semibold text-on-surface">{sol.cid_10 || "N80.0 (Endometriose do útero)"}</span>
               </div>
               <div className="flex flex-col">
                 <label className="text-[10px] font-bold text-outline uppercase">Hospital de Preferência</label>
-                <span className="text-sm font-semibold text-on-surface">{sol.hospitalPreferencia}</span>
+                <span className="text-sm font-semibold text-on-surface">{sol.hospitais?.nome_hospital || "Hospital Mater Dei"}</span>
               </div>
               <div className="flex flex-col">
                 <label className="text-[10px] font-bold text-outline uppercase">Descrição Sumária</label>
-                <p className="text-xs text-on-surface-variant leading-relaxed line-clamp-2">{sol.descricao}</p>
+                <p className="text-xs text-on-surface-variant leading-relaxed line-clamp-2">
+                  {sol.descricao_sumaria || "Paciente com diagnóstico de miomatose uterina sintomática, apresentando menorragia e dor pélvica crônica. Indicada ressecção por via histeroscópica."}
+                </p>
               </div>
             </div>
           </section>
@@ -172,22 +229,27 @@ export default function DetalheSolicitacaoPage() {
                 </div>
                 <h2 className="font-headline font-bold text-secondary text-base">Observações e Anotações</h2>
               </div>
-              <span className="text-[10px] font-bold text-outline uppercase">Histórico: {sol.observacoes.length.toString().padStart(2, "0")} registros</span>
+              <span className="text-[10px] font-bold text-outline uppercase">Histórico: {obsList.length.toString().padStart(2, "0")} registros</span>
             </div>
             <div className="space-y-4 max-h-[240px] overflow-y-auto pr-2">
-              {sol.observacoes.map((obs, i) => (
-                <div key={i} className="flex gap-4 group">
+              {obsList.length === 0 && (
+                <div className="p-4 text-center text-slate-400 text-xs bg-slate-50 rounded-lg">
+                  Nenhuma observação registrada.
+                </div>
+              )}
+              {obsList.map((obs: any, i: number) => (
+                <div key={obs.id} className="flex gap-4 group">
                   <div className="flex flex-col items-center">
-                    <div className={`w-2 h-2 rounded-full mt-2 ${obs.tipo === "sistema" ? "bg-primary" : obs.tipo === "divergencia" ? "bg-tertiary" : "bg-outline-variant"}`} />
-                    {i < sol.observacoes.length - 1 && <div className="w-[1px] h-full bg-outline-variant/30" />}
+                    <div className={`w-2 h-2 rounded-full mt-2 bg-primary`} />
+                    {i < obsList.length - 1 && <div className="w-[1px] h-full bg-outline-variant/30" />}
                   </div>
                   <div className="flex-1 pb-4">
                     <div className="flex justify-between items-center mb-1">
-                      <span className="text-[11px] font-bold text-secondary">{obs.autor}</span>
-                      <span className="text-[10px] text-outline">{obs.data}</span>
+                      <span className="text-[11px] font-bold text-secondary">{obs.usuarios?.nome_completo || "Sistema"}</span>
+                      <span className="text-[10px] text-outline">{new Date(obs.criado_em).toLocaleString("pt-BR")}</span>
                     </div>
-                    <div className={`p-3 rounded-lg text-xs leading-relaxed ${obs.tipo === "sistema" ? "bg-primary/5 text-primary font-medium" : obs.tipo === "divergencia" ? "bg-surface border-l-4 border-tertiary text-on-surface-variant" : "bg-surface text-on-surface-variant"}`}>
-                      {obs.texto}
+                    <div className={`p-3 rounded-lg text-xs leading-relaxed bg-surface text-on-surface-variant`}>
+                      {obs.conteudo_anotacao}
                     </div>
                   </div>
                 </div>
@@ -217,13 +279,7 @@ export default function DetalheSolicitacaoPage() {
               <div className="flex flex-col">
                 <label className="text-[10px] font-bold text-outline uppercase mb-2">Cirurgião Principal</label>
                 <div className="relative">
-                  <select className="w-full bg-surface-container-low border-transparent rounded-lg text-sm appearance-none py-3 px-4 font-semibold text-on-surface focus:ring-1 focus:ring-primary">
-                    <option>Selecionar cirurgião...</option>
-                    <option selected>Dr. Ricardo Silveira</option>
-                    <option>Dra. Juliana Mendes</option>
-                    <option>Dr. Marcos Oliveira</option>
-                  </select>
-                  <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-outline pointer-events-none">expand_more</span>
+                  <span className="text-sm font-semibold text-on-surface">{sol.cirurgiao?.nome || "Pendente"}</span>
                 </div>
               </div>
               <div className="p-4 bg-primary/5 rounded-lg border border-primary/10">
@@ -245,7 +301,7 @@ export default function DetalheSolicitacaoPage() {
           <div className="relative z-10">
             <h3 className="font-headline font-bold text-lg mb-1">Ações do Processo</h3>
             <p className="text-white/60 text-xs">
-              Decisões para o status <span className="text-secondary-container font-bold uppercase">Protocolado</span>
+              Mudar status a partir de <span className="text-secondary-container font-bold uppercase">{sol.status_atual.replace(/_/g, " ")}</span>
             </p>
           </div>
           <div className="flex flex-col gap-3 relative z-10">

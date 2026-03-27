@@ -53,11 +53,21 @@ export default function SideNavBar() {
         })}
       </nav>
 
-      {/* CTA */}
-      <button className="mt-auto mx-2 bg-primary-container text-white py-3 rounded-xl font-bold text-sm shadow-md hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
-        <span className="material-symbols-outlined text-sm">add</span>
-        Novo Atendimento
-      </button>
+      {/* Bottom Actions */}
+      <div className="mt-auto pt-6 border-t border-slate-100 flex items-center justify-around px-2">
+        <button className="p-2.5 text-slate-500 hover:bg-slate-100 hover:text-primary rounded-xl transition-all duration-200 flex flex-col items-center gap-1">
+          <span className="material-symbols-outlined !text-[22px]">notifications</span>
+          <span className="text-[10px] font-bold uppercase">Avisos</span>
+        </button>
+        <button className="p-2.5 text-slate-500 hover:bg-slate-100 hover:text-primary rounded-xl transition-all duration-200 flex flex-col items-center gap-1">
+          <span className="material-symbols-outlined !text-[22px]">account_circle</span>
+          <span className="text-[10px] font-bold uppercase">Perfil</span>
+        </button>
+        <button className="p-2.5 text-slate-400 hover:bg-red-50 hover:text-red-500 rounded-xl transition-all duration-200 flex flex-col items-center gap-1">
+          <span className="material-symbols-outlined !text-[22px]">logout</span>
+          <span className="text-[10px] font-bold uppercase">Sair</span>
+        </button>
+      </div>
     </aside>
   );
 }

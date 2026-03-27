@@ -1,11 +1,4 @@
-"use client";
-
-const kpiCards = [
-  { icon: "assignment", label: "Total de Solicitações", value: "1.284", change: "+12%", changeColor: "text-emerald-500", bgColor: "bg-blue-50", iconColor: "text-blue-600", hoverBg: "group-hover:bg-primary group-hover:text-white" },
-  { icon: "medical_services", label: "Cirurgias Realizadas", value: "452", change: "+5.2%", changeColor: "text-emerald-500", bgColor: "bg-teal-50", iconColor: "text-teal-600", hoverBg: "group-hover:bg-tertiary group-hover:text-white" },
-  { icon: "pending_actions", label: "Aguardando Autorização", value: "86", change: "-2.4%", changeColor: "text-orange-500", bgColor: "bg-orange-50", iconColor: "text-orange-600", hoverBg: "group-hover:bg-orange-500 group-hover:text-white" },
-  { icon: "analytics", label: "Taxa de Conversão", value: "74.2%", change: "+8%", changeColor: "text-emerald-500", bgColor: "bg-blue-50", iconColor: "text-blue-700", hoverBg: "group-hover:bg-primary-container group-hover:text-white" },
-];
+import { supabase } from "@/lib/supabase";
 
 const months = [
   { label: "JAN", height: "60%", highlight: false },
@@ -16,13 +9,45 @@ const months = [
   { label: "JUN", height: "55%", highlight: false },
 ];
 
-const tableData = [
-  { procedimento: "Parto Cesariana", medico: "Dra. Mariana Silva", data: "22/05/2024", status: "CONCLUÍDO", statusColor: "bg-tertiary-fixed text-on-tertiary-fixed", valor: "R$ 12.500,00" },
-  { procedimento: "Histeroscopia", medico: "Dr. Ricardo Souza", data: "21/05/2024", status: "EM ANÁLISE", statusColor: "bg-secondary-container text-on-secondary-container", valor: "R$ 4.200,00" },
-  { procedimento: "Consulta Pré-Natal", medico: "Dra. Mariana Silva", data: "20/05/2024", status: "CONCLUÍDO", statusColor: "bg-tertiary-fixed text-on-tertiary-fixed", valor: "R$ 450,00" },
-];
+export const revalidate = 0; // Disable cache to always compute fresh data
 
-export default function RelatoriosPage() {
+export default async function RelatoriosPage() {
+  const { data: solicitacoes } = await supabase
+    .from("solicitacoes_cirurgia")
+    .select(`
+      status_atual,
+      procedimento_descricao,
+      data_solicitacao,
+      medicos!solicitacoes_cirurgia_medico_solicitante_id_fkey(nome)
+    `)
+    .order("data_solicitacao", { ascending: false });
+
+  const data = solicitacoes || [];
+
+  const total = data.length;
+  const realizadas = data.filter(s => s.status_atual === 'cirurgia_realizada').length;
+  const aguardando = data.filter(s => ['solicitado', 'protocolado', 'divergencia', 'defesa', 'junta_medica', 'pendencia_agendamento'].includes(s.status_atual)).length;
+  const taxa = total > 0 ? Math.round((realizadas / total) * 100) : 0;
+
+  const kpiCards = [
+    { icon: "assignment", label: "Total de Solicitações", value: total.toString(), change: "+2%", changeColor: "text-emerald-500", bgColor: "bg-blue-50", iconColor: "text-blue-600", hoverBg: "group-hover:bg-primary group-hover:text-white" },
+    { icon: "medical_services", label: "Cirurgias Realizadas", value: realizadas.toString(), change: "+1%", changeColor: "text-emerald-500", bgColor: "bg-teal-50", iconColor: "text-teal-600", hoverBg: "group-hover:bg-tertiary group-hover:text-white" },
+    { icon: "pending_actions", label: "Acesso Pendente / Em Análise", value: aguardando.toString(), change: "-5%", changeColor: "text-orange-500", bgColor: "bg-orange-50", iconColor: "text-orange-600", hoverBg: "group-hover:bg-orange-500 group-hover:text-white" },
+    { icon: "analytics", label: "Taxa de Conversão", value: `${taxa}%`, change: "+12%", changeColor: "text-emerald-500", bgColor: "bg-blue-50", iconColor: "text-blue-700", hoverBg: "group-hover:bg-primary-container group-hover:text-white" },
+  ];
+
+  // Map latest 5 for the table
+  const tableData = data.slice(0, 5).map((sol: any) => ({
+    procedimento: sol.procedimento_descricao,
+    medico: sol.medicos?.nome || "Não Informado",
+    data: new Date(sol.data_solicitacao).toLocaleDateString("pt-BR"),
+    status: sol.status_atual.replace("_", " ").toUpperCase(),
+    statusColor: sol.status_atual === "cirurgia_realizada" ? "bg-tertiary-fixed text-on-tertiary-fixed" : 
+                 sol.status_atual === "agendado" ? "bg-primary-container text-white" : 
+                 "bg-secondary-container text-on-secondary-container",
+    valor: "R$ --" // Not in schema yet
+  }));
+
   return (
     <>
       <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6 py-8">
@@ -145,23 +170,23 @@ export default function RelatoriosPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-primary" />
-                <span className="text-xs font-medium text-slate-600">Concluídos</span>
+                <span className="text-xs font-medium text-slate-600">Concluídos / Agendados</span>
               </div>
-              <span className="text-xs font-bold text-slate-800">60%</span>
+              <span className="text-xs font-bold text-slate-800">{ total > 0 ? Math.round(((realizadas + data.filter(s => s.status_atual === 'agendado').length) / total) * 100) : 0 }%</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-tertiary" />
-                <span className="text-xs font-medium text-slate-600">Em Análise</span>
+                <span className="text-xs font-medium text-slate-600">Em Análise / Autorizado</span>
               </div>
-              <span className="text-xs font-bold text-slate-800">25%</span>
+              <span className="text-xs font-bold text-slate-800">{ total > 0 ? Math.round(((data.filter(s => ['solicitado', 'protocolado', 'junta_medica', 'autorizado', 'pendencia_agendamento', 'reiniciado', 'defesa'].includes(s.status_atual)).length) / total) * 100) : 0 }%</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-orange-400" />
-                <span className="text-xs font-medium text-slate-600">Pendentes</span>
+                <span className="text-xs font-medium text-slate-600">Divergência / Negados / Cancelados / Desistência</span>
               </div>
-              <span className="text-xs font-bold text-slate-800">15%</span>
+              <span className="text-xs font-bold text-slate-800">{ total > 0 ? Math.round(((data.filter(s => ['divergencia', 'negado', 'cancelado', 'desistencia'].includes(s.status_atual)).length) / total) * 100) : 0 }%</span>
             </div>
           </div>
         </div>
@@ -191,11 +216,11 @@ export default function RelatoriosPage() {
                   <td className="px-6 py-4"><span className="text-sm font-semibold text-slate-800">{row.procedimento}</span></td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-primary-fixed flex items-center justify-center text-primary font-bold text-[8px]">
-                        {row.medico.split(" ").map((n) => n[0]).slice(0, 2).join("")}
-                      </div>
-                      <span className="text-sm text-slate-600">{row.medico}</span>
-                    </div>
+                       <div className="w-6 h-6 rounded-full bg-primary-fixed flex items-center justify-center text-primary font-bold text-[8px]">
+                         {row.medico.split(" ").map((n: string) => n[0]).slice(0, 2).join("")}
+                       </div>
+                       <span className="text-sm text-slate-600">{row.medico}</span>
+                     </div>
                   </td>
                   <td className="px-6 py-4"><span className="text-sm text-slate-600">{row.data}</span></td>
                   <td className="px-6 py-4"><span className={`inline-flex px-2 py-1 rounded-full ${row.statusColor} text-[10px] font-bold uppercase`}>{row.status}</span></td>
