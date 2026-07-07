@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 
 export default function AgendaPage() {
+  const supabase = createClient();
   const [view, setView] = useState<"mes" | "semana" | "dia">("mes");
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

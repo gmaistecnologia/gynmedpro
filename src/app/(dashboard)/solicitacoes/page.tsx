@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 import SolicitacoesTable from "@/components/solicitacoes/SolicitacoesTable";
 import SolicitacoesKanban from "@/components/solicitacoes/SolicitacoesKanban";
 import SolicitacaoDetailsModal from "@/components/solicitacoes/SolicitacaoDetailsModal";
 import NovaSolicitacaoModal from "@/components/solicitacoes/NovaSolicitacaoModal";
 
 export default function SolicitacoesPage() {
+  const supabase = createClient();
   const [viewMode, setViewMode] = useState<"table" | "kanban">("table");
   const [solicitacoes, setSolicitacoes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

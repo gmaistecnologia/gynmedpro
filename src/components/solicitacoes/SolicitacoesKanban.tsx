@@ -8,7 +8,7 @@ import {
   Draggable,
   type DropResult,
 } from "@hello-pangea/dnd";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 
 export type Solicitacao = {
   id: string;
@@ -143,6 +143,7 @@ interface SolicitacoesKanbanProps {
 }
 
 export default function SolicitacoesKanban({ initialSolicitacoes, onOpenDetails }: SolicitacoesKanbanProps) {
+  const supabase = createClient();
   const [boardData, setBoardData] = useState<Record<string, Solicitacao[]>>({
     solicitado: [], protocolado: [], autorizado: [], agendado: [], realizada: []
   });

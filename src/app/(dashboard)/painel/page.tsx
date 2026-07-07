@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useState, useEffect, useMemo } from "react";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 
 export default function PainelPage() {
+  const supabase = createClient();
   const [stats, setStats] = useState([
     { label: "Pacientes Atendidos", value: "0", icon: "group", color: "text-blue-600", bg: "bg-blue-50" },
     { label: "Cirurgias Agendadas", value: "0", icon: "calendar_today", color: "text-amber-600", bg: "bg-amber-50" },

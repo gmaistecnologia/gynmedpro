@@ -1,8 +1,9 @@
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 import { SolicitacaoStatus } from "@/components/ui/StatusBadge";
 
 export default async function DetalheSolicitacaoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const supabase = await createClient();
 
   // Fetch solicitation with relationships
   const { data: sol } = await supabase

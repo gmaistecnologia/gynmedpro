@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 
 const sideLinks = [
   { label: "Painel", icon: "dashboard", href: "/painel" },
@@ -15,6 +15,7 @@ const sideLinks = [
 
 export default function SideNavBar() {
   const pathname = usePathname();
+  const supabase = createClient();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [userSession, setUserSession] = useState<any>(null);
 

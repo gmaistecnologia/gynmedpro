@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 
 interface SolicitacaoDetailsModalProps {
   id: string;
@@ -10,6 +10,7 @@ interface SolicitacaoDetailsModalProps {
 }
 
 export default function SolicitacaoDetailsModal({ id, isOpen, onClose }: SolicitacaoDetailsModalProps) {
+  const supabase = createClient();
   const [sol, setSol] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [obsList, setObsList] = useState<any[]>([]);

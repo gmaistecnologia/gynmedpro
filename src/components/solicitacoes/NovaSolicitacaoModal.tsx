@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 
 interface NovaSolicitacaoModalProps {
   isOpen: boolean;
@@ -10,6 +10,7 @@ interface NovaSolicitacaoModalProps {
 }
 
 export default function NovaSolicitacaoModal({ isOpen, onClose, onSuccess }: NovaSolicitacaoModalProps) {
+  const supabase = createClient();
   const [loading, setLoading] = useState(false);
   const [hospitais, setHospitais] = useState<any[]>([]);
   
