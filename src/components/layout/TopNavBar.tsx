@@ -1,62 +1,42 @@
-"use client";
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../../lib/auth'
 
-import Image from "next/image";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+export function TopNavBar() {
+  const { profile, signOut } = useAuth()
+  const navigate = useNavigate()
 
-const navLinks = [
-  { label: "Gerenciamento", href: "/solicitacoes" },
-  { label: "Relatórios", href: "/relatorios" },
-  { label: "Configurações", href: "/configuracoes" },
-];
-
-export default function TopNavBar() {
-  const pathname = usePathname();
+  async function handleSignOut() {
+    await signOut()
+    navigate('/login', { replace: true })
+  }
 
   return (
-    <header className="fixed top-0 left-0 w-full flex justify-between items-center px-6 py-3 bg-white/80 backdrop-blur-lg z-50 border-b border-slate-100 shadow-sm">
-      {/* Left: Logo Area */}
-      <div className="flex-1 flex items-center">
-        <Link href="/solicitacoes" className="flex items-center gap-3">
-          <div className="relative w-12 h-12 overflow-hidden rounded-lg border border-slate-100">
-            <Image
-              src="/logo.png"
-              alt="Gynmed Pro Logo"
-              fill
-              className="object-cover"
-            />
-          </div>
-          <span className="font-headline font-black text-2xl tracking-tight text-gynmed-dark">
-            Gynmed Pro
-          </span>
-        </Link>
+    <header className="fixed top-0 left-0 w-full h-16 flex items-center justify-between px-4 sm:px-6 glass-effect z-50 border-b border-outline-variant/10">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="font-headline font-black text-xl sm:text-2xl tracking-tight text-gynmed-dark shrink-0">
+          Gynmed
+        </span>
+        <span className="w-2 h-2 rounded-full bg-primary-container shrink-0" />
+        <span className="ml-2 text-sm font-semibold text-on-surface-variant hidden lg:inline truncate">
+          Portal Comercial
+        </span>
       </div>
-
-      {/* Center: Navigation Links */}
-      <nav className="hidden md:flex items-center justify-center gap-2">
-        {navLinks.map((link) => {
-          const isActive = pathname.startsWith(link.href);
-          return (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`
-                px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 font-body
-                ${isActive
-                  ? "bg-primary-container text-white shadow-md shadow-primary/20 scale-105"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-primary transition-all"
-                }
-              `}
-            >
-              {link.label}
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* Right: Space for layout balance */}
-      <div className="flex-1" />
+      <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+        <div className="hidden sm:flex flex-col items-end leading-tight">
+          <span className="text-sm font-bold text-on-surface">{profile?.nome}</span>
+          <span className="text-[11px] text-outline uppercase tracking-wide">{profile?.role.replace('_', ' ')}</span>
+        </div>
+        <div className="w-9 h-9 rounded-full bg-primary-container flex items-center justify-center text-on-primary font-bold text-sm shrink-0">
+          {profile?.nome?.slice(0, 2).toUpperCase()}
+        </div>
+        <button
+          onClick={handleSignOut}
+          className="p-2 text-outline hover:text-error hover:bg-error-container/40 rounded-lg transition-colors shrink-0"
+          title="Sair"
+        >
+          <span className="material-symbols-outlined">logout</span>
+        </button>
+      </div>
     </header>
-  );
+  )
 }

@@ -1,0 +1,133 @@
+@import "tailwindcss";
+
+@theme inline {
+  /* ── Colors: Gynmed Design System ── */
+  --color-primary: #0059af;
+  --color-primary-container: #1271d8;
+  --color-primary-fixed: #d6e3ff;
+  --color-primary-fixed-dim: #a9c7ff;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #f8f8ff;
+  --color-on-primary-fixed: #001b3d;
+  --color-on-primary-fixed-variant: #00468c;
+
+  --color-secondary: #396285;
+  --color-secondary-container: #add6fe;
+  --color-secondary-fixed: #cde5ff;
+  --color-secondary-fixed-dim: #a2cbf3;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: #345d80;
+  --color-on-secondary-fixed: #001d32;
+  --color-on-secondary-fixed-variant: #1e4a6c;
+
+  --color-tertiary: #006654;
+  --color-tertiary-container: #00816b;
+  --color-tertiary-fixed: #76f9d9;
+  --color-tertiary-fixed-dim: #56dcbd;
+  --color-on-tertiary: #ffffff;
+  --color-on-tertiary-container: #e1fff4;
+  --color-on-tertiary-fixed: #002019;
+  --color-on-tertiary-fixed-variant: #005142;
+
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+  --color-on-error: #ffffff;
+  --color-on-error-container: #93000a;
+
+  --color-surface: #f8f9fa;
+  --color-surface-bright: #f8f9fa;
+  --color-surface-dim: #d9dadb;
+  --color-surface-variant: #e1e3e4;
+  --color-surface-tint: #005db7;
+  --color-surface-container: #edeeef;
+  --color-surface-container-low: #f3f4f5;
+  --color-surface-container-high: #e7e8e9;
+  --color-surface-container-highest: #e1e3e4;
+  --color-surface-container-lowest: #ffffff;
+
+  --color-on-surface: #191c1d;
+  --color-on-surface-variant: #414753;
+  --color-background: #f8f9fa;
+  --color-on-background: #191c1d;
+
+  --color-outline: #727784;
+  --color-outline-variant: #c1c6d5;
+
+  --color-inverse-surface: #2e3132;
+  --color-inverse-on-surface: #f0f1f2;
+  --color-inverse-primary: #a9c7ff;
+
+  --color-gynmed-dark: #0B3D5E;
+
+  /* ── Fonts ── */
+  --font-headline: "Montserrat", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-label: "Inter", sans-serif;
+
+  /* ── Border Radius ── */
+  --radius-DEFAULT: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+}
+
+/* Google Fonts loaded via <link> in index.html */
+
+/* ── Material Symbols ── */
+.material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+
+/* ── Glass Effect ── */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* ── Ambient Shadow ── */
+.elevation-ambient {
+  box-shadow: 0 8px 24px rgba(11, 61, 94, 0.06);
+}
+
+/* ── Custom Scrollbar ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #c1c6d5;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #727784;
+}
+
+/* ── Base ── */
+/*
+  Hard guardrail against horizontal page scroll. The layout (fixed topbar +
+  sticky sidebar + flex content) is built so nothing should ever need to
+  overflow horizontally — wide content (tables, charts) must scroll inside
+  its own `overflow-x-auto` container instead. This rule is the safety net,
+  not the fix: if a page scrolls sideways, something inside it is missing
+  `min-w-0` or its own scroll container, not this line.
+*/
+html,
+body,
+#root {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+body {
+  background-color: #f8f9fa;
+  color: #191c1d;
+  font-family: "Inter", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-family: "Montserrat", sans-serif;
+}

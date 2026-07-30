@@ -1,269 +1,356 @@
-"use client";
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
+import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../lib/auth'
+import { Card } from '../ui/Card'
+import { Button } from '../ui/Button'
+import { SearchableSelect } from '../ui/SearchableSelect'
+import { ProdutoSearchInput } from './ProdutoSearchInput'
+import type { Hospital, PlanoSaude, Produto, StatusSolicitacao, TipoCirurgia } from '../../lib/types'
 
-import { useState, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
-
-interface NovaSolicitacaoModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess?: () => void;
+type ItemForm = {
+  produto: Produto
+  quantidade: number
 }
 
-export default function NovaSolicitacaoModal({ isOpen, onClose, onSuccess }: NovaSolicitacaoModalProps) {
-  const supabase = createClient();
-  const [loading, setLoading] = useState(false);
-  const [hospitais, setHospitais] = useState<any[]>([]);
-  
-  const [formData, setFormData] = useState({
-    paciente_nome: "",
-    medico_nome: "",
-    hospital_id: "",
-    procedimento: "",
-    convenio: "",
-    data_solicitacao: new Date().toISOString().split('T')[0],
-    observacoes: ""
-  });
+export function NovaSolicitacaoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { profile } = useAuth()
+  const navigate = useNavigate()
+
+  const [hospitais, setHospitais] = useState<Hospital[]>([])
+  const [planosSaude, setPlanosSaude] = useState<PlanoSaude[]>([])
+  const [tiposCirurgia, setTiposCirurgia] = useState<TipoCirurgia[]>([])
+
+  const [hospitalId, setHospitalId] = useState('')
+  const [planoSaudeId, setPlanoSaudeId] = useState('')
+  const [tipoCirurgiaId, setTipoCirurgiaId] = useState('')
+  const [medico, setMedico] = useState('')
+  const [paciente, setPaciente] = useState('')
+  const [dataCirurgia, setDataCirurgia] = useState('')
+  const [observacoes, setObservacoes] = useState('')
+  const [itens, setItens] = useState<ItemForm[]>([])
+  const [arquivos, setArquivos] = useState<File[]>([])
+  const [saving, setSaving] = useState<StatusSolicitacao | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (isOpen) {
-      fetchHospitais();
-    }
-  }, [isOpen]);
+    if (!open) return
+    supabase.from('hospitais').select('*').order('nome_fantasia').then(({ data }) => setHospitais(data ?? []))
+    supabase.from('planos_saude').select('*').order('nome').then(({ data }) => setPlanosSaude(data ?? []))
+    supabase.from('tipos_cirurgia').select('*').order('nome').then(({ data }) => setTiposCirurgia(data ?? []))
+  }, [open])
 
-  async function fetchHospitais() {
-    const { data } = await supabase.from("hospitais").select("id, nome_hospital").order("nome_hospital");
-    setHospitais(data || []);
-    if (data && data.length > 0 && !formData.hospital_id) {
-      setFormData(prev => ({ ...prev, hospital_id: data[0].id }));
-    }
+  function resetForm() {
+    setHospitalId('')
+    setPlanoSaudeId('')
+    setTipoCirurgiaId('')
+    setMedico('')
+    setPaciente('')
+    setDataCirurgia('')
+    setObservacoes('')
+    setItens([])
+    setArquivos([])
   }
 
-  async function getOrCreatePatient(name: string, plano: string) {
-    const { data: existing } = await supabase.from('pacientes').select('id').eq('nome', name).maybeSingle();
-    if (existing) {
-      if (plano) {
-          await supabase.from('pacientes').update({ plano_saude: plano }).eq('id', existing.id);
+  function handleClose() {
+    if (saving) return
+    resetForm()
+    onClose()
+  }
+
+  function addProduto(produto: Produto) {
+    setItens((prev) => {
+      const existing = prev.find((i) => i.produto.id === produto.id)
+      if (existing) {
+        return prev.map((i) => (i.produto.id === produto.id ? { ...i, quantidade: i.quantidade + 1 } : i))
       }
-      return existing.id;
+      return [...prev, { produto, quantidade: 1 }]
+    })
+  }
+
+  function updateQuantidade(produtoId: string, quantidade: number) {
+    setItens((prev) => prev.map((i) => (i.produto.id === produtoId ? { ...i, quantidade } : i)))
+  }
+
+  function removeItem(produtoId: string) {
+    setItens((prev) => prev.filter((i) => i.produto.id !== produtoId))
+  }
+
+  function handleFilesSelected(files: FileList | null) {
+    if (!files) return
+    setArquivos((prev) => [...prev, ...Array.from(files)])
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  function removeArquivo(index: number) {
+    setArquivos((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  function isValid() {
+    return Boolean(
+      hospitalId && medico.trim() && paciente.trim() && planoSaudeId && tipoCirurgiaId && itens.length > 0,
+    )
+  }
+
+  async function handleSubmit(status: StatusSolicitacao) {
+    if (!profile || !isValid()) {
+      toast.error('Preencha hospital, médico, paciente, plano de saúde, tipo de cirurgia e ao menos um produto.')
+      return
     }
-    const { data: created, error } = await supabase.from('pacientes').insert({ 
-      nome: name, 
-      plano_saude: plano,
-      cpf: `NEW-${Math.random().toString(36).substr(2, 6).toUpperCase()}` 
-    }).select('id').single();
-    if (error) throw error;
-    return created.id;
-  }
 
-  async function getOrCreateDoctor(name: string) {
-    const { data: existing } = await supabase.from('medicos').select('id').eq('nome', name).maybeSingle();
-    if (existing) return existing.id;
-    const { data: created, error } = await supabase.from('medicos').insert({ 
-      nome: name, 
-      crm: `NEW-${Math.random().toString(36).substr(2, 6).toUpperCase()}` 
-    }).select('id').single();
-    if (error) throw error;
-    return created.id;
-  }
+    setSaving(status)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+    const { data: solicitacao, error } = await supabase
+      .from('solicitacoes_cirurgicas')
+      .insert({
+        representante_id: profile.id,
+        hospital_id: hospitalId,
+        plano_saude_id: planoSaudeId,
+        tipo_cirurgia_id: tipoCirurgiaId,
+        medico_cirurgiao: medico.trim(),
+        paciente_nome: paciente.trim(),
+        data_cirurgia: dataCirurgia ? new Date(dataCirurgia).toISOString() : null,
+        observacoes: observacoes.trim() || null,
+        status,
+      })
+      .select()
+      .single()
 
-    try {
-      const pId = await getOrCreatePatient(formData.paciente_nome, formData.convenio);
-      const mId = await getOrCreateDoctor(formData.medico_nome);
+    if (error || !solicitacao) {
+      setSaving(null)
+      toast.error('Não foi possível salvar a solicitação.')
+      return
+    }
 
-      const { data: { user } } = await supabase.auth.getUser();
-      const currentUserId = user?.id;
+    const { error: itensError } = await supabase.from('itens_solicitados').insert(
+      itens.map((i) => ({
+        solicitacao_id: solicitacao.id,
+        produto_id: i.produto.id,
+        quantidade_estimada: i.quantidade,
+      })),
+    )
 
-      const { data: newSol, error } = await supabase.from("solicitacoes_cirurgia").insert({
-        numero_solicitacao: `SOL-${Date.now().toString().slice(-6)}`,
-        paciente_id: pId,
-        medico_solicitante_id: mId,
-        hospital_id: formData.hospital_id,
-        representante_responsavel_id: currentUserId,
-        procedimento_descricao: formData.procedimento,
-        status_atual: "solicitado",
-        data_solicitacao: formData.data_solicitacao,
-      }).select().single();
+    if (itensError) {
+      toast.error('Solicitação criada, mas houve erro ao salvar os produtos.')
+    }
 
-      if (error) throw error;
-
-      if (formData.observacoes && newSol) {
-        await supabase.from("historico_anotacoes").insert({
-          solicitacao_id: newSol.id,
-          usuario_id: currentUserId,
-          anotacao: formData.observacoes
-        });
+    for (const arquivo of arquivos) {
+      const path = `${profile.id}/${solicitacao.id}/${arquivo.name}`
+      const { error: uploadError } = await supabase.storage.from('anexos-solicitacoes').upload(path, arquivo)
+      if (uploadError) {
+        toast.error(`Falha ao anexar "${arquivo.name}".`)
+        continue
       }
-
-      onSuccess?.();
-      onClose();
-      setFormData({
-        paciente_nome: "",
-        medico_nome: "",
-        hospital_id: hospitais[0]?.id || "",
-        procedimento: "",
-        convenio: "",
-        data_solicitacao: new Date().toISOString().split('T')[0],
-        observacoes: ""
-      });
-    } catch (err: any) {
-      console.error(err);
-      alert("Erro ao salvar: " + err.message);
-    } finally {
-      setLoading(false);
+      await supabase
+        .from('anexos_solicitacoes')
+        .insert({ solicitacao_id: solicitacao.id, nome_arquivo: arquivo.name, storage_path: path })
     }
-  };
 
-  if (!isOpen) return null;
+    setSaving(null)
+    toast.success(status === 'enviado' ? 'Solicitação enviada para aprovação!' : 'Rascunho salvo.')
+    resetForm()
+    onClose()
+    navigate(`/solicitacoes/${solicitacao.id}`)
+  }
+
+  if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 overflow-y-auto">
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-secondary/60 backdrop-blur-md transition-opacity" 
-        onClick={onClose} 
-      />
-      
-      {/* Modal Container */}
-      <div className="relative bg-surface w-full max-w-2xl h-fit max-h-[90vh] rounded-[32px] shadow-2xl overflow-hidden border border-slate-100 flex flex-col animate-in fade-in zoom-in duration-300 my-auto">
-        <header className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white relative z-10 shrink-0">
-          <h2 className="font-headline font-bold text-2xl text-secondary tracking-tight">Novo Atendimento</h2>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-secondary focus:outline-none">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-inverse-surface/40 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
+      <Card className="w-full max-w-2xl my-8 sm:my-0 flex flex-col max-h-[calc(100vh-4rem)]">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-outline-variant/10 shrink-0">
+          <div>
+            <h2 className="font-headline font-bold text-xl text-secondary">Nova Solicitação</h2>
+            <p className="text-xs text-on-surface-variant mt-0.5">
+              Preencha os dados da cirurgia e os materiais estimados.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleClose}
+            className="p-2 text-outline hover:text-on-surface hover:bg-surface-container-high rounded-lg transition-colors shrink-0"
+          >
             <span className="material-symbols-outlined">close</span>
           </button>
-        </header>
+        </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 p-8 space-y-6 overflow-y-auto custom-scrollbar">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Paciente */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px] text-primary">person</span> Paciente
+        <div className="overflow-y-auto px-6 py-6 flex flex-col gap-6 min-w-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-outline uppercase tracking-wide ml-1">Hospital *</label>
+              <select
+                value={hospitalId}
+                onChange={(e) => setHospitalId(e.target.value)}
+                className="bg-surface-container-low border border-outline-variant/20 rounded-lg text-sm py-3 px-4 focus:ring-2 focus:ring-primary/10 focus:border-primary"
+              >
+                <option value="">Selecione…</option>
+                {hospitais.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.nome_fantasia} {h.cidade ? `— ${h.cidade}/${h.uf}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-outline uppercase tracking-wide ml-1">
+                Data e hora da cirurgia
               </label>
               <input
-                required
-                type="text"
-                placeholder="Nome completo do paciente"
-                className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none font-body"
-                value={formData.paciente_nome}
-                onChange={e => setFormData(prev => ({ ...prev, paciente_nome: e.target.value }))}
+                type="datetime-local"
+                value={dataCirurgia}
+                onChange={(e) => setDataCirurgia(e.target.value)}
+                className="bg-surface-container-low border border-outline-variant/20 rounded-lg text-sm py-3 px-4 focus:ring-2 focus:ring-primary/10 focus:border-primary"
               />
             </div>
 
-            {/* Médico */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px] text-primary">person_add</span> Médico Solicitante
-              </label>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-outline uppercase tracking-wide ml-1">Médico cirurgião *</label>
               <input
-                required
                 type="text"
-                placeholder="Nome do médico"
-                className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none font-body"
-                value={formData.medico_nome}
-                onChange={e => setFormData(prev => ({ ...prev, medico_nome: e.target.value }))}
+                value={medico}
+                onChange={(e) => setMedico(e.target.value)}
+                placeholder="Dr(a). Nome completo"
+                className="bg-surface-container-low border border-outline-variant/20 rounded-lg text-sm py-3 px-4 focus:ring-2 focus:ring-primary/10 focus:border-primary"
               />
             </div>
 
-            {/* Hospital */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px] text-primary">hospital</span> Hospital
-              </label>
-              <div className="relative">
-                <select
-                  required
-                  className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none appearance-none font-body"
-                  value={formData.hospital_id}
-                  onChange={e => setFormData(prev => ({ ...prev, hospital_id: e.target.value }))}
-                >
-                  {hospitais.map(h => (
-                    <option key={h.id} value={h.id}>{h.nome_hospital}</option>
-                  ))}
-                </select>
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                   <span className="material-symbols-outlined">expand_more</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Convênio */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px] text-primary">credit_card</span> Convênio
-              </label>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-outline uppercase tracking-wide ml-1">Paciente *</label>
               <input
                 type="text"
-                placeholder="Ex: Unimed, Cassi, Bradesco..."
-                className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none font-body"
-                value={formData.convenio}
-                onChange={e => setFormData(prev => ({ ...prev, convenio: e.target.value }))}
+                value={paciente}
+                onChange={(e) => setPaciente(e.target.value)}
+                placeholder="Nome completo da paciente"
+                className="bg-surface-container-low border border-outline-variant/20 rounded-lg text-sm py-3 px-4 focus:ring-2 focus:ring-primary/10 focus:border-primary"
               />
             </div>
 
-            {/* Procedimento */}
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px] text-primary">description</span> Procedimento
-              </label>
-              <input
-                required
-                type="text"
-                placeholder="Descrição resumida do procedimento"
-                className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none font-body"
-                value={formData.procedimento}
-                onChange={e => setFormData(prev => ({ ...prev, procedimento: e.target.value }))}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-outline uppercase tracking-wide ml-1">Plano de saúde *</label>
+              <SearchableSelect
+                options={planosSaude}
+                value={planoSaudeId}
+                onChange={setPlanoSaudeId}
+                placeholder="Buscar plano de saúde…"
               />
             </div>
 
-            {/* Data Solicitação */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px] text-primary">calendar_today</span> Data da Solicitação
-              </label>
-              <input
-                required
-                type="date"
-                className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none font-body"
-                value={formData.data_solicitacao}
-                onChange={e => setFormData(prev => ({ ...prev, data_solicitacao: e.target.value }))}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-outline uppercase tracking-wide ml-1">Tipo de cirurgia *</label>
+              <SearchableSelect
+                options={tiposCirurgia}
+                value={tipoCirurgiaId}
+                onChange={setTipoCirurgiaId}
+                placeholder="Buscar tipo de cirurgia…"
               />
             </div>
           </div>
 
-          {/* Observações */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Observações Iniciais</label>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-outline uppercase tracking-wide ml-1">Observações</label>
             <textarea
+              value={observacoes}
+              onChange={(e) => setObservacoes(e.target.value)}
               rows={3}
-              placeholder="Descreva aqui detalhes iniciais importantes..."
-              className="w-full px-5 py-4 rounded-2xl border border-slate-100 bg-slate-50/50 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none resize-none font-body"
-              value={formData.observacoes}
-              onChange={e => setFormData(prev => ({ ...prev, observacoes: e.target.value }))}
+              placeholder="Informações adicionais para o comercial…"
+              className="bg-surface-container-low border border-outline-variant/20 rounded-lg text-sm p-4 focus:ring-2 focus:ring-primary/10 focus:border-primary"
             />
           </div>
 
-          <footer className="pt-6 sticky bottom-0 bg-surface">
+          <div className="flex flex-col gap-3">
+            <label className="text-xs font-bold text-outline uppercase tracking-wide ml-1">Materiais estimados *</label>
+            <ProdutoSearchInput onSelect={addProduto} />
+
+            {itens.length === 0 ? (
+              <p className="text-sm text-on-surface-variant py-2 text-center">Nenhum produto adicionado ainda.</p>
+            ) : (
+              <ul className="flex flex-col gap-3">
+                {itens.map((item) => (
+                  <li
+                    key={item.produto.id}
+                    className="flex items-center justify-between gap-4 bg-surface-container-low rounded-lg px-4 py-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-on-surface truncate">{item.produto.nome}</p>
+                      <p className="text-xs text-on-surface-variant truncate">
+                        TUSS {item.produto.codigo_tuss ?? '—'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <input
+                        type="number"
+                        min={1}
+                        value={item.quantidade}
+                        onChange={(e) => updateQuantidade(item.produto.id, Math.max(1, Number(e.target.value)))}
+                        className="w-16 text-center bg-surface-container-lowest border border-outline-variant/20 rounded-lg text-sm py-1.5"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeItem(item.produto.id)}
+                        className="text-outline hover:text-error transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-lg">delete</span>
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <label className="text-xs font-bold text-outline uppercase tracking-wide ml-1">Anexar documentos</label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+              onChange={(e) => handleFilesSelected(e.target.files)}
+              className="hidden"
+            />
             <button
-              disabled={loading}
-              type="submit"
-              className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-5 rounded-2xl transition-all shadow-xl shadow-primary/20 flex items-center justify-center gap-3 disabled:opacity-50 active:scale-[0.98] font-body"
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center justify-center gap-2 border-2 border-dashed border-outline-variant/40 rounded-lg py-4 text-sm font-semibold text-on-surface-variant hover:border-primary hover:text-primary transition-colors"
             >
-              {loading ? (
-                <div className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <>
-                  <span className="material-symbols-outlined">save</span>
-                  Salvar Atendimento
-                </>
-              )}
+              <span className="material-symbols-outlined">upload_file</span>
+              Selecionar arquivos (PDF, imagem ou Word)
             </button>
-          </footer>
-        </form>
-      </div>
+
+            {arquivos.length > 0 && (
+              <ul className="flex flex-col gap-2">
+                {arquivos.map((arquivo, index) => (
+                  <li
+                    key={`${arquivo.name}-${index}`}
+                    className="flex items-center justify-between gap-3 bg-surface-container-low rounded-lg px-4 py-2.5"
+                  >
+                    <span className="text-sm text-on-surface truncate min-w-0 flex-1">{arquivo.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeArquivo(index)}
+                      className="text-outline hover:text-error transition-colors shrink-0"
+                    >
+                      <span className="material-symbols-outlined text-lg">delete</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-outline-variant/10 shrink-0">
+          <Button variant="secondary" isLoading={saving === 'rascunho'} disabled={saving !== null} onClick={() => handleSubmit('rascunho')}>
+            Salvar Rascunho
+          </Button>
+          <Button isLoading={saving === 'enviado'} disabled={saving !== null} onClick={() => handleSubmit('enviado')}>
+            Enviar para o Comercial
+            <span className="material-symbols-outlined text-[18px]">send</span>
+          </Button>
+        </div>
+      </Card>
     </div>
-  );
+  )
 }

@@ -1,36 +1,72 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Gynmed Pro — Módulo Comercial
 
-## Getting Started
+ERP para operações de OPME da Gynmed. Esta é a fase piloto: o **Módulo Comercial**,
+que digitaliza o fluxo de solicitação e aprovação de materiais cirúrgicos hoje
+preso a um sistema legado acessível apenas por VPN.
 
-First, run the development server:
+## Stack
+
+- **Vite + React 19 + TypeScript**
+- **Tailwind CSS v4** (tokens do design system em [src/index.css](src/index.css))
+- **Supabase** — Postgres (com RLS), Auth e Realtime
+- **React Router**, **Recharts**, **Sonner** (toasts), **date-fns**
+
+## Rodando localmente
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev      # http://localhost:5173
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Copie `.env.example` para `.env` e preencha `VITE_SUPABASE_URL` e
+`VITE_SUPABASE_ANON_KEY` (encontrados em Project Settings → API no painel do
+Supabase). `SUPABASE_SERVICE_ROLE_KEY` só é necessária para scripts
+administrativos locais (ex: criação de usuários via Admin API) — nunca é lida
+pelo bundle do navegador.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Contas de teste (Auth)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Papel | E-mail | Senha |
+|---|---|---|
+| Admin | admin@gynmedpro.com.br | GynMed@2026Admin |
+| Gerente Comercial | gerente@gynmedpro.com.br | GynMed@2026Gerente |
+| Representante | representante@gynmedpro.com.br | GynMed@2026Rep |
 
-## Learn More
+Troque essas senhas antes de qualquer uso além de desenvolvimento/demo.
 
-To learn more about Next.js, take a look at the following resources:
+## Modelo de dados
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Cinco tabelas no schema `public`, todas com Row Level Security ativo:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **profiles** — estende `auth.users` (nome, role, comissão). Criada automaticamente
+  por trigger (`handle_new_user`) quando um usuário é cadastrado no Auth.
+- **hospitais** — cadastro de clientes/locais (leitura liberada, escrita restrita a admin).
+- **produtos** — catálogo com código TUSS/ANVISA e preço de tabela (leitura liberada, escrita restrita a admin).
+- **solicitacoes_cirurgicas** — o coração do módulo. Fluxo de status:
+  `rascunho → enviado → aprovado_gerente | recusado → faturado`.
+  Representante só enxerga/edita as próprias solicitações e não pode
+  alterá-las para um status de aprovação — apenas gerente/admin fazem essa
+  transição (garantido via RLS, não só na UI).
+- **itens_solicitados** — produtos de cada solicitação (cascade ao apagar a solicitação pai).
 
-## Deploy on Vercel
+Migrações aplicadas diretamente no projeto Supabase (`fvsbvbppdmuhwlydjxsn`) via
+MCP — não há pasta `supabase/migrations` neste repo ainda. Rode
+`supabase db pull` caso queira versionar o schema localmente.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Papéis e fluxo
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Representante** (mobile-first): Painel → Nova Solicitação → Histórico.
+  Recebe notificação em tempo real (Supabase Realtime + toast) assim que o
+  gestor aprova ou recusa uma cirurgia.
+- **Gerente Comercial / Admin** (desktop): Painel de Aprovações (aprovar/recusar
+  com motivo) e Relatórios (volume por hospital, ranking por representante,
+  previsão de faturamento das próximas semanas).
+
+## Identidade visual
+
+A paleta, tipografia (Montserrat + Inter) e princípios de layout ("Santuário de
+Precisão" — sem bordas sólidas, profundidade por camadas de tom, sombras
+ambiente azuladas) estão documentados em
+[stitch_assets/design_system.md](stitch_assets/design_system.md) e
+[stitch_assets/design_system.json](stitch_assets/design_system.json). Os tokens
+Tailwind correspondentes vivem em [src/index.css](src/index.css).

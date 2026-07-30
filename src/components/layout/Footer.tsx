@@ -1,29 +1,14 @@
-export default function Footer() {
+export function Footer() {
   return (
-    <footer className="ml-64 w-[calc(100%-16rem)] mt-auto flex flex-col md:flex-row justify-between items-center px-8 gap-4 bg-white py-8 border-t border-slate-100">
-      <span className="font-body text-xs uppercase tracking-widest text-slate-400">
-        © 2024 Gynmed Digital Experience. Todos os direitos reservados.
-      </span>
-      <div className="flex gap-8">
-        <a
-          className="font-body text-xs uppercase tracking-widest text-slate-400 hover:text-gynmed-dark underline underline-offset-4 opacity-80 hover:opacity-100 transition-all"
-          href="#"
-        >
-          Privacidade
-        </a>
-        <a
-          className="font-body text-xs uppercase tracking-widest text-slate-400 hover:text-gynmed-dark underline underline-offset-4 opacity-80 hover:opacity-100 transition-all"
-          href="#"
-        >
-          Termos de Uso
-        </a>
-        <a
-          className="font-body text-xs uppercase tracking-widest text-slate-400 hover:text-gynmed-dark underline underline-offset-4 opacity-80 hover:opacity-100 transition-all"
-          href="#"
-        >
-          Suporte
-        </a>
+    <footer className="w-full mt-auto flex flex-col md:flex-row justify-between items-center px-4 sm:px-8 py-6 border-t border-outline-variant/10 bg-surface-container-lowest gap-3 text-center md:text-left">
+      <div className="flex items-center gap-2">
+        <span className="text-gynmed-dark font-bold text-xs uppercase tracking-widest">Gynmed Digital Experience</span>
+        <span className="text-outline-variant">|</span>
+        <p className="text-outline text-xs uppercase tracking-widest">© 2026. Todos os direitos reservados.</p>
+      </div>
+      <div className="flex items-center gap-6">
+        <span className="text-outline text-xs uppercase tracking-widest">Módulo Comercial</span>
       </div>
     </footer>
-  );
+  )
 }
