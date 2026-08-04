@@ -7,6 +7,8 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.4"
   }
@@ -107,6 +109,57 @@ export type Database = {
           },
         ]
       }
+      metas_comerciais: {
+        Row: {
+          atualizado_em: string
+          criado_em: string
+          id: string
+          mes_referencia: string
+          meta_valor: number
+        }
+        Insert: {
+          atualizado_em?: string
+          criado_em?: string
+          id?: string
+          mes_referencia: string
+          meta_valor: number
+        }
+        Update: {
+          atualizado_em?: string
+          criado_em?: string
+          id?: string
+          mes_referencia?: string
+          meta_valor?: number
+        }
+        Relationships: []
+      }
+      metas_representantes: {
+        Row: {
+          atualizado_em: string
+          criado_em: string
+          id: string
+          mes_referencia: string
+          meta_valor: number
+          representante_nome: string
+        }
+        Insert: {
+          atualizado_em?: string
+          criado_em?: string
+          id?: string
+          mes_referencia: string
+          meta_valor: number
+          representante_nome: string
+        }
+        Update: {
+          atualizado_em?: string
+          criado_em?: string
+          id?: string
+          mes_referencia?: string
+          meta_valor?: number
+          representante_nome?: string
+        }
+        Relationships: []
+      }
       planos_saude: {
         Row: {
           criado_em: string
@@ -175,6 +228,41 @@ export type Database = {
           role?: string
         }
         Relationships: []
+      }
+      report_medico_status: {
+        Row: {
+          atualizado_em: string
+          criado_em: string
+          data_protocolo: string | null
+          observacoes: string | null
+          solicitacao_id: string
+          status_final: string
+        }
+        Insert: {
+          atualizado_em?: string
+          criado_em?: string
+          data_protocolo?: string | null
+          observacoes?: string | null
+          solicitacao_id: string
+          status_final?: string
+        }
+        Update: {
+          atualizado_em?: string
+          criado_em?: string
+          data_protocolo?: string | null
+          observacoes?: string | null
+          solicitacao_id?: string
+          status_final?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_medico_status_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: true
+            referencedRelation: "solicitacoes_importadas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       solicitacoes_cirurgicas: {
         Row: {
@@ -253,6 +341,105 @@ export type Database = {
           },
         ]
       }
+      solicitacoes_importadas: {
+        Row: {
+          atualizado_em: string
+          criado_em: string
+          data_aprovacao: string | null
+          data_cirurgia: string | null
+          data_orcamento: string | null
+          data_reprovacao: string | null
+          data_solicitacao: string | null
+          data_validade: string | null
+          descricao_grupo: string | null
+          descricao_tipo: string | null
+          hora_cirurgia: string | null
+          hospital_nome: string | null
+          hospital_uf: string | null
+          id: string
+          importado_por: string | null
+          medico_nome: string | null
+          nro_agendamento: string
+          nro_orcamento: string | null
+          paciente_nome: string | null
+          plano_saude_nome: string | null
+          representante_id: string | null
+          representante_nome: string | null
+          situacao: string | null
+          valor_orcamento: number | null
+          valor_realizado: number | null
+        }
+        Insert: {
+          atualizado_em?: string
+          criado_em?: string
+          data_aprovacao?: string | null
+          data_cirurgia?: string | null
+          data_orcamento?: string | null
+          data_reprovacao?: string | null
+          data_solicitacao?: string | null
+          data_validade?: string | null
+          descricao_grupo?: string | null
+          descricao_tipo?: string | null
+          hora_cirurgia?: string | null
+          hospital_nome?: string | null
+          hospital_uf?: string | null
+          id?: string
+          importado_por?: string | null
+          medico_nome?: string | null
+          nro_agendamento: string
+          nro_orcamento?: string | null
+          paciente_nome?: string | null
+          plano_saude_nome?: string | null
+          representante_id?: string | null
+          representante_nome?: string | null
+          situacao?: string | null
+          valor_orcamento?: number | null
+          valor_realizado?: number | null
+        }
+        Update: {
+          atualizado_em?: string
+          criado_em?: string
+          data_aprovacao?: string | null
+          data_cirurgia?: string | null
+          data_orcamento?: string | null
+          data_reprovacao?: string | null
+          data_solicitacao?: string | null
+          data_validade?: string | null
+          descricao_grupo?: string | null
+          descricao_tipo?: string | null
+          hora_cirurgia?: string | null
+          hospital_nome?: string | null
+          hospital_uf?: string | null
+          id?: string
+          importado_por?: string | null
+          medico_nome?: string | null
+          nro_agendamento?: string
+          nro_orcamento?: string | null
+          paciente_nome?: string | null
+          plano_saude_nome?: string | null
+          representante_id?: string | null
+          representante_nome?: string | null
+          situacao?: string | null
+          valor_orcamento?: number | null
+          valor_realizado?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "solicitacoes_importadas_importado_por_fkey"
+            columns: ["importado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacoes_importadas_representante_id_fkey"
+            columns: ["representante_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tipos_cirurgia: {
         Row: {
           criado_em: string
@@ -277,6 +464,7 @@ export type Database = {
     }
     Functions: {
       get_my_role: { Args: never; Returns: string }
+      upsert_solicitacoes_importadas: { Args: { linhas: Json }; Returns: Json }
     }
     Enums: {
       [_ in never]: never
@@ -368,6 +556,40 @@ export type TablesUpdate<
       }
       ? U
       : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
 
 export const Constants = {

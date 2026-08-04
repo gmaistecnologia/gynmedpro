@@ -6,6 +6,7 @@ import { useAuth } from '../../lib/auth'
 import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
 import { SearchableSelect } from '../ui/SearchableSelect'
+import { DateField } from '../ui/DateField'
 import { ProdutoSearchInput } from './ProdutoSearchInput'
 import type { Hospital, PlanoSaude, Produto, StatusSolicitacao, TipoCirurgia } from '../../lib/types'
 
@@ -28,6 +29,7 @@ export function NovaSolicitacaoModal({ open, onClose }: { open: boolean; onClose
   const [medico, setMedico] = useState('')
   const [paciente, setPaciente] = useState('')
   const [dataCirurgia, setDataCirurgia] = useState('')
+  const [horaCirurgia, setHoraCirurgia] = useState('')
   const [observacoes, setObservacoes] = useState('')
   const [itens, setItens] = useState<ItemForm[]>([])
   const [arquivos, setArquivos] = useState<File[]>([])
@@ -48,6 +50,7 @@ export function NovaSolicitacaoModal({ open, onClose }: { open: boolean; onClose
     setMedico('')
     setPaciente('')
     setDataCirurgia('')
+    setHoraCirurgia('')
     setObservacoes('')
     setItens([])
     setArquivos([])
@@ -110,7 +113,7 @@ export function NovaSolicitacaoModal({ open, onClose }: { open: boolean; onClose
         tipo_cirurgia_id: tipoCirurgiaId,
         medico_cirurgiao: medico.trim(),
         paciente_nome: paciente.trim(),
-        data_cirurgia: dataCirurgia ? new Date(dataCirurgia).toISOString() : null,
+        data_cirurgia: dataCirurgia ? new Date(`${dataCirurgia}T${horaCirurgia || '00:00'}`).toISOString() : null,
         observacoes: observacoes.trim() || null,
         status,
       })
@@ -179,30 +182,33 @@ export function NovaSolicitacaoModal({ open, onClose }: { open: boolean; onClose
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-outline uppercase tracking-wide ml-1">Hospital *</label>
-              <select
+              <SearchableSelect
+                options={hospitais.map((h) => ({
+                  id: h.id,
+                  nome: `${h.nome_fantasia}${h.cidade ? ` — ${h.cidade}/${h.uf}` : ''}`,
+                }))}
                 value={hospitalId}
-                onChange={(e) => setHospitalId(e.target.value)}
-                className="bg-surface-container-low border border-outline-variant/20 rounded-lg text-sm py-3 px-4 focus:ring-2 focus:ring-primary/10 focus:border-primary"
-              >
-                <option value="">Selecione…</option>
-                {hospitais.map((h) => (
-                  <option key={h.id} value={h.id}>
-                    {h.nome_fantasia} {h.cidade ? `— ${h.cidade}/${h.uf}` : ''}
-                  </option>
-                ))}
-              </select>
+                onChange={setHospitalId}
+                placeholder="Selecione…"
+                searchPlaceholder="Buscar hospital…"
+              />
             </div>
 
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-outline uppercase tracking-wide ml-1">
                 Data e hora da cirurgia
               </label>
-              <input
-                type="datetime-local"
-                value={dataCirurgia}
-                onChange={(e) => setDataCirurgia(e.target.value)}
-                className="bg-surface-container-low border border-outline-variant/20 rounded-lg text-sm py-3 px-4 focus:ring-2 focus:ring-primary/10 focus:border-primary"
-              />
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <DateField value={dataCirurgia} onChange={setDataCirurgia} placeholder="Data" />
+                </div>
+                <input
+                  type="time"
+                  value={horaCirurgia}
+                  onChange={(e) => setHoraCirurgia(e.target.value)}
+                  className="w-[110px] shrink-0 h-[46px] bg-surface-container-low border border-outline-variant/20 rounded-lg text-sm px-3 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-colors"
+                />
+              </div>
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -233,7 +239,8 @@ export function NovaSolicitacaoModal({ open, onClose }: { open: boolean; onClose
                 options={planosSaude}
                 value={planoSaudeId}
                 onChange={setPlanoSaudeId}
-                placeholder="Buscar plano de saúde…"
+                placeholder="Selecione…"
+                searchPlaceholder="Buscar plano de saúde…"
               />
             </div>
 
@@ -243,7 +250,8 @@ export function NovaSolicitacaoModal({ open, onClose }: { open: boolean; onClose
                 options={tiposCirurgia}
                 value={tipoCirurgiaId}
                 onChange={setTipoCirurgiaId}
-                placeholder="Buscar tipo de cirurgia…"
+                placeholder="Selecione…"
+                searchPlaceholder="Buscar tipo de cirurgia…"
               />
             </div>
           </div>

@@ -9,6 +9,9 @@ import { HistoricoSolicitacoesPage } from './pages/HistoricoSolicitacoesPage'
 import { SolicitacaoDetailPage } from './pages/SolicitacaoDetailPage'
 import { AprovacoesPage } from './pages/AprovacoesPage'
 import { RelatoriosPage } from './pages/RelatoriosPage'
+import { ReportMedicoPage } from './pages/ReportMedicoPage'
+import { ImportarPlanilhaPage } from './pages/ImportarPlanilhaPage'
+import { ConfiguracoesPage } from './pages/ConfiguracoesPage'
 
 export default function App() {
   return (
@@ -28,10 +31,16 @@ export default function App() {
 
               <Route path="/solicitacoes" element={<HistoricoSolicitacoesPage />} />
               <Route path="/solicitacoes/:id" element={<SolicitacaoDetailPage />} />
+              <Route path="/relatorios/report-medico" element={<ReportMedicoPage />} />
 
               <Route element={<RequireRole roles={['gerente_comercial', 'admin']} />}>
                 <Route path="/aprovacoes" element={<AprovacoesPage />} />
                 <Route path="/relatorios" element={<RelatoriosPage />} />
+              </Route>
+
+              <Route element={<RequireRole roles={['admin']} />}>
+                <Route path="/importar" element={<ImportarPlanilhaPage />} />
+                <Route path="/configuracoes" element={<ConfiguracoesPage />} />
               </Route>
             </Route>
           </Route>

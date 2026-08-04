@@ -17,6 +17,10 @@ export type TipoCirurgia = Tables<'tipos_cirurgia'>
 export type SolicitacaoCirurgica = Tables<'solicitacoes_cirurgicas'>
 export type ItemSolicitado = Tables<'itens_solicitados'>
 export type AnexoSolicitacao = Tables<'anexos_solicitacoes'>
+export type SolicitacaoImportada = Tables<'solicitacoes_importadas'>
+export type MetaComercial = Tables<'metas_comerciais'>
+export type MetaRepresentante = Tables<'metas_representantes'>
+export type ReportMedicoStatus = Tables<'report_medico_status'>
 
 export type SolicitacaoComRelacoes = SolicitacaoCirurgica & {
   hospitais: Pick<Hospital, 'id' | 'nome_fantasia' | 'cidade' | 'uf'> | null
