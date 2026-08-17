@@ -12,6 +12,7 @@ import {
   Tooltip,
 } from 'recharts'
 import { supabase } from '../lib/supabase'
+import { fetchTodasPaginas } from '../lib/fetchPaginado'
 import { useAuth } from '../lib/auth'
 import { Card } from '../components/ui/Card'
 import { StatTile } from '../components/ui/StatTile'
@@ -31,6 +32,14 @@ const GRID_COLOR = '#e1e3e4'
 const SITUACOES_REALIZADAS = ['Faturado', 'Cirurgia realizada']
 
 const MESES_ABREV = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ']
+
+// paciente_nome e os campos de detalhe (hospital, nº de agendamento/orçamento, datas do fluxo)
+// alimentam o painel lateral de "Pipeline Comercial por Representante" — sem eles, todo paciente
+// cai no fallback "Sem paciente informado" mesmo quando a planilha importada tem o nome.
+const CAMPOS_SOLICITACOES =
+  'id, paciente_nome, data_cirurgia, situacao, valor_realizado, valor_orcamento, representante_nome, ' +
+  'descricao_tipo, medico_nome, plano_saude_nome, hospital_nome, nro_agendamento, nro_orcamento, ' +
+  'data_solicitacao, data_orcamento, data_aprovacao'
 
 function mesRefAtual(): string {
   const now = new Date()
@@ -96,16 +105,21 @@ export function RelatoriosPage() {
 
   useEffect(() => {
     async function load() {
-      const [{ data: solicitacoesData }, { data: metasData }, { data: metasRepData }] = await Promise.all([
-        supabase
-          .from('solicitacoes_importadas')
-          .select(
-            'data_cirurgia, situacao, valor_realizado, valor_orcamento, representante_nome, descricao_tipo, medico_nome, plano_saude_nome',
-          ),
+      const [solicitacoesData, { data: metasData }, { data: metasRepData }] = await Promise.all([
+        fetchTodasPaginas<SolicitacaoImportada>((offset, limite) =>
+          supabase
+            .from('solicitacoes_importadas')
+            .select(CAMPOS_SOLICITACOES)
+            .order('id', { ascending: true })
+            .range(offset, offset + limite - 1)
+            // CAMPOS_SOLICITACOES é uma variável (não um literal), então o supabase-js não
+            // consegue inferir o formato exato da linha selecionada a partir da string.
+            .then(({ data, error }) => ({ data: data as unknown as SolicitacaoImportada[] | null, error })),
+        ),
         supabase.from('metas_comerciais').select('*'),
         supabase.from('metas_representantes').select('*'),
       ])
-      setSolicitacoes((solicitacoesData as SolicitacaoImportada[]) ?? [])
+      setSolicitacoes(solicitacoesData)
       setMetas((metasData as MetaComercial[]) ?? [])
       setMetasRep((metasRepData as MetaRepresentante[]) ?? [])
       setLoading(false)

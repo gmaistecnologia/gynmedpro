@@ -11,6 +11,7 @@ const STATUS_CONFIG: Record<string, { label: string; icon: string }> = {
   'Cirurgia realizada': { label: 'Cirurgia realizada', icon: 'health_and_safety' },
   'A vencer': { label: 'A vencer', icon: 'schedule' },
   Vencido: { label: 'Vencido', icon: 'event_busy' },
+  Reprovado: { label: 'Reprovado', icon: 'cancel' },
   // Vocabulário legado (fluxo manual de solicitacoes_cirurgicas, desativado no momento)
   rascunho: { label: 'Rascunho', icon: 'draft' },
   enviado: { label: 'Enviado', icon: 'send' },

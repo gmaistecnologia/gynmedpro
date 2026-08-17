@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
@@ -17,6 +17,11 @@ import {
   type StatusExtra,
 } from '../lib/reportMedicoStatus'
 import type { SolicitacaoImportada } from '../lib/types'
+
+// A tabela tem mais de 10 mil solicitações — buscar/renderizar tudo de uma vez deixava a tela
+// lenta e travava a navegação. A partir daqui, busca, filtro de status e paginação acontecem no
+// próprio Supabase: cada página busca só os 100 registros que vai exibir.
+const TAMANHO_PAGINA = 100
 
 // Mesma paleta da coluna "Status Final" (statusIconeClasse), para que valores iguais ou
 // equivalentes das duas colunas (ex.: "Cirurgia realizada") fiquem sempre com a mesma cor.
@@ -46,46 +51,82 @@ function formatarDataBR(dataIso: string | null): string {
 export function HistoricoSolicitacoesPage() {
   const { profile } = useAuth()
   const [solicitacoes, setSolicitacoes] = useState<Linha[]>([])
+  const [totalCount, setTotalCount] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+  const [buscaInput, setBuscaInput] = useState('')
+  const [busca, setBusca] = useState('')
   const [statusFilter, setStatusFilter] = useState<string[]>([])
+  const [pagina, setPagina] = useState(1)
+  const [paginaInput, setPaginaInput] = useState('1')
+  const [refreshTick, setRefreshTick] = useState(0)
   const [selecionadaId, setSelecionadaId] = useState<string | null>(null)
 
   const isGestor = profile?.role === 'gerente_comercial' || profile?.role === 'admin'
 
-  function carregar() {
-    return supabase
-      .from('solicitacoes_importadas')
-      .select('*, report_medico_status(status_final, data_protocolo, observacoes)')
-      .order('data_cirurgia', { ascending: false })
-      .then(({ data }) => {
-        setSolicitacoes((data as unknown as Linha[]) ?? [])
-        setLoading(false)
-      })
+  // Debounce da busca por texto — evita 1 request por tecla digitada.
+  useEffect(() => {
+    const timeout = setTimeout(() => setBusca(buscaInput.trim()), 300)
+    return () => clearTimeout(timeout)
+  }, [buscaInput])
+
+  // Sempre que a busca ou o filtro de status mudam, volta pra primeira página. Comparação em
+  // tempo de render (em vez de um efeito reagindo a [busca, statusFilter]) segue o padrão do
+  // próprio React para "resetar estado quando outro estado muda", sem o re-render em cascata de
+  // um setState síncrono dentro de efeito.
+  const [filtrosAnteriores, setFiltrosAnteriores] = useState({ busca, statusFilter })
+  if (filtrosAnteriores.busca !== busca || filtrosAnteriores.statusFilter !== statusFilter) {
+    setFiltrosAnteriores({ busca, statusFilter })
+    setPagina(1)
+  }
+
+  // Mantém o campo "Ir para página" sincronizado quando a página muda por outro caminho
+  // (botões anterior/próxima), sem sobrescrever o que o usuário estiver digitando nele.
+  const [paginaSincronizada, setPaginaSincronizada] = useState(pagina)
+  if (paginaSincronizada !== pagina) {
+    setPaginaSincronizada(pagina)
+    setPaginaInput(String(pagina))
   }
 
   useEffect(() => {
-    carregar()
-  }, [])
+    let cancelado = false
+    setLoading(true)
+
+    // Filtros primeiro, paginação/ordenação por último — depois de `.order()`/`.range()` o
+    // builder do supabase-js não aceita mais `.or()`/`.in()`.
+    let query = supabase
+      .from('solicitacoes_importadas')
+      .select('*, report_medico_status(status_final, data_protocolo, observacoes)', { count: 'exact' })
+
+    if (busca) query = query.or(`paciente_nome.ilike.%${busca}%,medico_nome.ilike.%${busca}%`)
+    if (statusFilter.length > 0) query = query.in('situacao', statusFilter)
+
+    // data_cirurgia se repete (ou é nula) em muitas linhas; sem um desempate único (`id`), a
+    // paginação por `.range()` pode pular ou duplicar registros entre páginas.
+    query
+      .order('data_cirurgia', { ascending: false })
+      .order('id', { ascending: true })
+      .range((pagina - 1) * TAMANHO_PAGINA, pagina * TAMANHO_PAGINA - 1)
+      .then(({ data, error, count }) => {
+        if (cancelado) return
+        if (error) {
+          toast.error('Não foi possível carregar as solicitações.')
+        } else {
+          setSolicitacoes((data as unknown as Linha[]) ?? [])
+          setTotalCount(count ?? 0)
+        }
+        setLoading(false)
+      })
+
+    return () => {
+      cancelado = true
+    }
+  }, [pagina, busca, statusFilter, refreshTick])
 
   function fecharModal() {
     setSelecionadaId(null)
     // Reflete inline na tabela qualquer alteração feita no modal (Status Final, Protocolo, Observações).
-    carregar()
+    setRefreshTick((t) => t + 1)
   }
-
-  const filtradas = useMemo(() => {
-    return solicitacoes.filter((s) => {
-      if (statusFilter.length > 0 && !statusFilter.includes(s.situacao ?? '')) return false
-      if (search.trim()) {
-        const q = search.toLowerCase()
-        return (
-          (s.paciente_nome ?? '').toLowerCase().includes(q) || (s.medico_nome ?? '').toLowerCase().includes(q)
-        )
-      }
-      return true
-    })
-  }, [solicitacoes, search, statusFilter])
 
   async function atualizarExtra(solicitacaoId: string, patch: Partial<StatusExtra>) {
     const anterior = solicitacoes
@@ -114,6 +155,13 @@ export function HistoricoSolicitacoesPage() {
     }
   }
 
+  const totalPaginas = Math.max(1, Math.ceil(totalCount / TAMANHO_PAGINA))
+
+  function irParaPagina() {
+    const alvo = Math.min(Math.max(1, Math.trunc(Number(paginaInput)) || 1), totalPaginas)
+    setPagina(alvo)
+  }
+
   const colunas = isGestor ? 9 : 8
 
   return (
@@ -137,8 +185,8 @@ export function HistoricoSolicitacoesPage() {
             </span>
             <input
               type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={buscaInput}
+              onChange={(e) => setBuscaInput(e.target.value)}
               placeholder="Buscar paciente ou médico…"
               className="w-full h-[46px] pl-10 pr-4 bg-surface-container-lowest border border-outline-variant/20 rounded-lg text-sm focus:ring-2 focus:ring-primary/10 focus:border-primary"
             />
@@ -198,14 +246,14 @@ export function HistoricoSolicitacoesPage() {
                     Carregando…
                   </td>
                 </tr>
-              ) : filtradas.length === 0 ? (
+              ) : solicitacoes.length === 0 ? (
                 <tr>
                   <td colSpan={colunas} className="px-6 py-8 text-center text-sm text-on-surface-variant">
                     Nenhuma solicitação encontrada.
                   </td>
                 </tr>
               ) : (
-                filtradas.map((s) => (
+                solicitacoes.map((s) => (
                   <tr key={s.id} className="hover:bg-surface-container-high/40 transition-colors group">
                     <td className="px-4 py-2.5">
                       <button
@@ -258,6 +306,52 @@ export function HistoricoSolicitacoesPage() {
             </tbody>
           </table>
         </div>
+
+        {!loading && totalCount > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-t border-outline-variant/10">
+            <p className="text-xs text-on-surface-variant">
+              Mostrando {(pagina - 1) * TAMANHO_PAGINA + 1}–{Math.min(pagina * TAMANHO_PAGINA, totalCount)} de{' '}
+              {totalCount}
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                disabled={pagina === 1}
+                onClick={() => setPagina((p) => p - 1)}
+                className="p-1.5 rounded-md text-outline hover:text-primary hover:bg-surface-container-high disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-outline transition-colors"
+              >
+                <span className="material-symbols-outlined text-lg">chevron_left</span>
+              </button>
+              <span className="text-xs font-semibold text-on-surface whitespace-nowrap">
+                {pagina} / {totalPaginas}
+              </span>
+              <button
+                type="button"
+                disabled={pagina === totalPaginas}
+                onClick={() => setPagina((p) => p + 1)}
+                className="p-1.5 rounded-md text-outline hover:text-primary hover:bg-surface-container-high disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-outline transition-colors"
+              >
+                <span className="material-symbols-outlined text-lg">chevron_right</span>
+              </button>
+              <div className="flex items-center gap-1.5 ml-2 pl-3 border-l border-outline-variant/20">
+                <label htmlFor="ir-para-pagina" className="text-xs text-on-surface-variant whitespace-nowrap">
+                  Ir para
+                </label>
+                <input
+                  id="ir-para-pagina"
+                  type="number"
+                  min={1}
+                  max={totalPaginas}
+                  value={paginaInput}
+                  onChange={(e) => setPaginaInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && irParaPagina()}
+                  onBlur={irParaPagina}
+                  className="w-14 h-7 text-center text-xs bg-surface-container-lowest border border-outline-variant/20 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </Card>
 
       <SolicitacaoDetailModal id={selecionadaId} onClose={fecharModal} />

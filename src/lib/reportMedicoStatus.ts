@@ -14,8 +14,11 @@ export function salvarReportMedicoStatus(solicitacaoId: string, patch: Partial<S
     .upsert({ solicitacao_id: solicitacaoId, ...patch }, { onConflict: 'solicitacao_id' })
 }
 
+// Sem registro em report_medico_status, a solicitação ainda não foi tocada pelo time de
+// acompanhamento — o campo fica em branco, fiel ao que veio da planilha importada, em vez de
+// presumir 'SOLICITADO'.
 export function statusFinalDe(extra: StatusExtra | null | undefined): string {
-  return extra?.status_final ?? 'SOLICITADO'
+  return extra?.status_final ?? ''
 }
 
 export function dataProtocoloDe(extra: StatusExtra | null | undefined): string | null {
@@ -37,6 +40,7 @@ export const STATUS_FINAL_OPCOES = [
   'NEGADO',
   'OUTROS',
   'PENDÊNCIA',
+  'PENDÊNCIA AGENDAMENTO',
   'PENDÊNCIAS GERAIS',
   'PROTOCOLADO',
   'REINICIADO',
@@ -53,6 +57,7 @@ const ICONE_POR_STATUS: Record<StatusFinal, string> = {
   DEFESA: 'gavel',
   REINICIADO: 'restart_alt',
   PENDÊNCIA: 'hourglass_top',
+  'PENDÊNCIA AGENDAMENTO': 'event_busy',
   'PENDÊNCIAS GERAIS': 'pending_actions',
   AUTORIZADO: 'verified',
   AGENDAMENTO: 'event_note',
@@ -65,5 +70,6 @@ const ICONE_POR_STATUS: Record<StatusFinal, string> = {
 }
 
 export function statusFinalIcone(status: string): string {
+  if (!status) return 'remove'
   return ICONE_POR_STATUS[status as StatusFinal] ?? 'label'
 }

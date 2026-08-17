@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { supabase } from './supabase'
-import { salvarReportMedicoStatus, type StatusExtra } from './reportMedicoStatus'
+import { salvarReportMedicoStatus, statusFinalDe, dataProtocoloDe, observacoesDe, type StatusExtra } from './reportMedicoStatus'
 import type { SolicitacaoImportada } from './types'
 
 type SolicitacaoComExtra = SolicitacaoImportada & { report_medico_status: StatusExtra | null }
@@ -34,9 +34,9 @@ export function useSolicitacaoDetail(id: string | null | undefined) {
     setSolicitacao({
       ...solicitacao,
       report_medico_status: {
-        status_final: solicitacao.report_medico_status?.status_final ?? 'SOLICITADO',
-        data_protocolo: solicitacao.report_medico_status?.data_protocolo ?? null,
-        observacoes: solicitacao.report_medico_status?.observacoes ?? null,
+        status_final: statusFinalDe(solicitacao.report_medico_status),
+        data_protocolo: dataProtocoloDe(solicitacao.report_medico_status),
+        observacoes: observacoesDe(solicitacao.report_medico_status),
         ...solicitacao.report_medico_status,
         ...patch,
       },

@@ -14,6 +14,7 @@ const GRUPO_POR_STATUS: Record<string, GrupoStatus> = {
   DEFESA: 'atencao',
   REINICIADO: 'atencao',
   'PENDÊNCIA': 'atencao',
+  'PENDÊNCIA AGENDAMENTO': 'atencao',
   'PENDÊNCIAS GERAIS': 'atencao',
   'A VENCER': 'atencao',
 
@@ -29,6 +30,7 @@ const GRUPO_POR_STATUS: Record<string, GrupoStatus> = {
   // Resultado negativo
   NEGADO: 'negativo',
   RECUSADO: 'negativo',
+  REPROVADO: 'negativo',
   'DESISTÊNCIA': 'negativo',
   CANCELADO: 'negativo',
   VENCIDO: 'negativo',

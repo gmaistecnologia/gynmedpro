@@ -18,7 +18,7 @@ import type { SolicitacaoImportada } from '../lib/types'
 const TAMANHO_PAGINA = 50
 
 const STATUS_EM_ABERTO = ['SOLICITADO', 'PROTOCOLADO']
-const STATUS_AUTORIZADAS = ['AUTORIZADO', 'AGENDAMENTO']
+const STATUS_AUTORIZADAS = ['AUTORIZADO', 'AGENDAMENTO', 'PENDÊNCIA AGENDAMENTO']
 const STATUS_NEGATIVAS = ['NEGADO', 'CANCELADO', 'DESISTÊNCIA']
 
 type StatusExtra = { status_final: string; data_protocolo: string | null; observacoes: string | null }

@@ -42,7 +42,7 @@ export const CAMPOS_DESTINO: CampoDestino[] = [
 // Linhas sem Nro.orcamento vêm da planilha com um valor de exportação malformado nesta
 // coluna (ex.: "60-Real.Com C- V=     17.736 e") em vez de um status real. Qualquer valor
 // fora deste conjunto conhecido é normalizado para "Cirurgia realizada".
-const SITUACOES_CONHECIDAS = new Set(['Faturado', 'Aprovado', 'Vencido', 'A vencer'])
+const SITUACOES_CONHECIDAS = new Set(['Faturado', 'Aprovado', 'Vencido', 'A vencer', 'Reprovado'])
 const SITUACAO_PADRAO_DESCONHECIDA = 'Cirurgia realizada'
 
 export type MapeamentoColunas = Partial<Record<CampoKey, number>>

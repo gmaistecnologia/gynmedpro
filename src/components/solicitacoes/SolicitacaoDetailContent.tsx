@@ -2,7 +2,7 @@ import { Card } from '../ui/Card'
 import { StatusFinalEditavel } from '../relatorios/StatusFinalEditavel'
 import { ProtocoloDateInput, ObservacaoTextarea } from '../relatorios/CamposAcompanhamentoEditaveis'
 import { SolicitacaoTimeline } from './SolicitacaoTimeline'
-import type { StatusExtra } from '../../lib/reportMedicoStatus'
+import { statusFinalDe, type StatusExtra } from '../../lib/reportMedicoStatus'
 import type { SolicitacaoImportada } from '../../lib/types'
 
 const currencyFull = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -44,7 +44,7 @@ export function SolicitacaoDetailContent({
       }`
     : 'A definir'
 
-  const statusFinal = statusExtra?.status_final ?? 'SOLICITADO'
+  const statusFinal = statusFinalDe(statusExtra)
 
   return (
     <div className="flex flex-col gap-6">

@@ -1,5 +1,6 @@
 import { Fragment, useMemo, useState } from 'react'
 import { Card } from '../ui/Card'
+import { StatusBadge } from '../ui/StatusBadge'
 import type { SolicitacaoImportada } from '../../lib/types'
 
 const SITUACOES_REALIZADAS = ['Faturado', 'Cirurgia realizada']
@@ -10,6 +11,24 @@ const currencyCompact = new Intl.NumberFormat('pt-BR', { style: 'currency', curr
 
 function mesKeyDe(dataIso: string): string {
   return dataIso.slice(0, 7)
+}
+
+// Datas do banco são `date` puro ('YYYY-MM-DD'); formatar via `new Date(...)` sofre deslocamento
+// de fuso (vira o dia anterior em UTC-3). Formatação direta na string evita isso.
+function formatarDataBR(dataIso: string | null): string | null {
+  if (!dataIso) return null
+  const [ano, mes, dia] = dataIso.split('-')
+  return `${dia}/${mes}/${ano}`
+}
+
+// Melhor data disponível para representar o item na linha do tempo do paciente: a da cirurgia
+// quando já aconteceu/está marcada, senão a última etapa do fluxo já preenchida.
+function melhorDataDe(item: SolicitacaoImportada): string | null {
+  return item.data_cirurgia ?? item.data_aprovacao ?? item.data_orcamento ?? item.data_solicitacao ?? null
+}
+
+function valorDoItem(item: SolicitacaoImportada): number {
+  return item.valor_realizado ?? item.valor_orcamento ?? 0
 }
 
 type Metrics = {
@@ -25,7 +44,7 @@ type Metrics = {
 
 type StatusFluxo = 'saudavel' | 'sem_cadencia' | 'sem_frequencia'
 
-type PacienteNode = { nome: string; metrics: Metrics; status: StatusFluxo }
+type PacienteNode = { nome: string; metrics: Metrics; status: StatusFluxo; itens: SolicitacaoImportada[] }
 type MedicoNode = { nome: string; metrics: Metrics; status: StatusFluxo; pacientes: PacienteNode[] }
 type RepNode = { nome: string; metrics: Metrics; medicos: MedicoNode[] }
 
@@ -149,6 +168,39 @@ function PainelPacientes({
                   <ValorQtde valor={p.metrics.cirurgiasValor} qtde={p.metrics.cirurgiasQtde} />
                 </div>
               </div>
+
+              <p className="text-[10px] font-bold text-outline uppercase tracking-wide mt-4 mb-2">
+                Registros ({p.itens.length})
+              </p>
+              <div className="space-y-2">
+                {p.itens.map((item) => {
+                  const data = formatarDataBR(melhorDataDe(item))
+                  const referencia =
+                    item.nro_agendamento && item.nro_agendamento !== 'S/A'
+                      ? `Agend. ${item.nro_agendamento}`
+                      : item.nro_orcamento
+                        ? `Orç. ${item.nro_orcamento}`
+                        : null
+                  return (
+                    <div key={item.id} className="rounded-lg bg-surface-container-low/70 px-3 py-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-xs font-semibold text-on-surface truncate">
+                          {item.descricao_tipo ?? 'Procedimento não informado'}
+                        </span>
+                        {item.situacao && <StatusBadge status={item.situacao} />}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-on-surface-variant mt-1.5">
+                        <span className="truncate">{item.hospital_nome ?? 'Hospital não informado'}</span>
+                        {data && <span className="shrink-0">· {data}</span>}
+                        {referencia && <span className="shrink-0">· {referencia}</span>}
+                        <span className="ml-auto shrink-0 font-semibold text-on-surface">
+                          {currencyCompact.format(valorDoItem(item))}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           ))}
         </div>
@@ -217,7 +269,12 @@ export function PipelineComercialTable({
           const pacientes: PacienteNode[] = Array.from(porPaciente.entries())
             .map(([nomePaciente, itensPaciente]) => {
               const metrics = calcularMetrics(itensPaciente, mesReferencia)
-              return { nome: nomePaciente, metrics, status: statusDe(metrics) }
+              const itens = [...itensPaciente].sort((a, b) => {
+                const dataA = melhorDataDe(a) ?? ''
+                const dataB = melhorDataDe(b) ?? ''
+                return dataB.localeCompare(dataA)
+              })
+              return { nome: nomePaciente, metrics, status: statusDe(metrics), itens }
             })
             .sort((a, b) => valorTotal(b.metrics) - valorTotal(a.metrics))
 
