@@ -20,6 +20,7 @@ function MesCalendario({
   hoverIso,
   onSelecionarDia,
   onHoverDia,
+  ocultarTitulo = false,
 }: {
   ano: number
   mes0: number
@@ -29,6 +30,7 @@ function MesCalendario({
   hoverIso: string | null
   onSelecionarDia: (iso: string) => void
   onHoverDia: (iso: string | null) => void
+  ocultarTitulo?: boolean
 }) {
   const hojeIsoValue = hojeIso()
   const fimPreview = ate || (de && hoverIso ? hoverIso : '')
@@ -37,9 +39,11 @@ function MesCalendario({
 
   return (
     <div className="flex-1 min-w-[240px]">
-      <p className="text-center font-headline font-bold text-sm text-on-surface mb-3">
-        {MESES[mes0]} {ano}
-      </p>
+      {!ocultarTitulo && (
+        <p className="text-center font-headline font-bold text-sm text-on-surface mb-3">
+          {MESES[mes0]} {ano}
+        </p>
+      )}
       <div className="grid grid-cols-7 mb-1">
         {DIAS_SEMANA.map((d) => (
           <span key={d} className="text-center text-[10px] font-bold text-outline uppercase py-1">
@@ -139,6 +143,27 @@ export function DateRangeField({
   const gradeEsquerda = useMemo(() => gradeDoMes(anoEsquerda, mesEsquerda), [anoEsquerda, mesEsquerda])
   const gradeDireita = useMemo(() => gradeDoMes(direita.ano, direita.mes0), [direita.ano, direita.mes0])
 
+  function irParaMesAnterior() {
+    const prev = deslocarMes(anoEsquerda, mesEsquerda, -1)
+    setAnoEsquerda(prev.ano)
+    setMesEsquerda(prev.mes0)
+  }
+
+  function irParaProximoMes() {
+    const next = deslocarMes(anoEsquerda, mesEsquerda, 1)
+    setAnoEsquerda(next.ano)
+    setMesEsquerda(next.mes0)
+  }
+
+  const anosDisponiveis = useMemo(() => {
+    const anoAtual = hoje.ano
+    const anos: number[] = []
+    for (let a = anoAtual - 8; a <= anoAtual + 2; a++) anos.push(a)
+    if (!anos.includes(anoEsquerda)) anos.push(anoEsquerda)
+    return anos.sort((a, b) => a - b)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anoEsquerda])
+
   function selecionarDia(iso: string) {
     if (!pendenteDe || (pendenteDe && pendenteAte)) {
       setPendenteDe(iso)
@@ -188,22 +213,90 @@ export function DateRangeField({
       </button>
 
       {open && (
+        <div
+          className="fixed inset-0 z-20 bg-black/40 transition-opacity"
+          aria-hidden="true"
+          onClick={() => setOpen(false)}
+        />
+      )}
+
+      {open && (
         <div className="absolute z-30 mt-2 bg-surface-container-lowest elevation-ambient rounded-2xl p-4 w-[300px] sm:w-[560px]">
-          <div className="flex flex-col sm:flex-row gap-4 sm:gap-0" onMouseLeave={() => setHoverIso(null)}>
+          {/* Mobile: um único mês por vez, com seletores de mês/ano */}
+          <div className="sm:hidden" onMouseLeave={() => setHoverIso(null)}>
+            <div className="flex items-end gap-2 mb-3">
+              <label className="flex-1 flex flex-col gap-1 min-w-0">
+                <span className="text-[11px] font-semibold text-on-surface-variant">Mês</span>
+                <select
+                  value={mesEsquerda}
+                  onChange={(e) => setMesEsquerda(Number(e.target.value))}
+                  className="w-full bg-surface-container-low border border-outline-variant/20 rounded-lg text-sm py-2 px-2 text-on-surface"
+                >
+                  {MESES.map((m, i) => (
+                    <option key={m} value={i}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[11px] font-semibold text-on-surface-variant">Ano</span>
+                <select
+                  value={anoEsquerda}
+                  onChange={(e) => setAnoEsquerda(Number(e.target.value))}
+                  className="bg-surface-container-low border border-outline-variant/20 rounded-lg text-sm py-2 px-2 text-on-surface"
+                >
+                  {anosDisponiveis.map((a) => (
+                    <option key={a} value={a}>
+                      {a}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={irParaMesAnterior}
+                  aria-label="Mês anterior"
+                  className="w-9 h-9 flex items-center justify-center rounded-lg bg-surface-container-low text-outline hover:text-primary hover:bg-surface-container-high transition-colors"
+                >
+                  <span className="material-symbols-outlined text-base">chevron_left</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={irParaProximoMes}
+                  aria-label="Próximo mês"
+                  className="w-9 h-9 flex items-center justify-center rounded-lg bg-surface-container-low text-outline hover:text-primary hover:bg-surface-container-high transition-colors"
+                >
+                  <span className="material-symbols-outlined text-base">chevron_right</span>
+                </button>
+              </div>
+            </div>
+            <MesCalendario
+              ano={anoEsquerda}
+              mes0={mesEsquerda}
+              grade={gradeEsquerda}
+              de={pendenteDe}
+              ate={pendenteAte}
+              hoverIso={hoverIso}
+              onSelecionarDia={selecionarDia}
+              onHoverDia={setHoverIso}
+              ocultarTitulo
+            />
+          </div>
+
+          {/* Desktop: dois meses lado a lado */}
+          <div className="hidden sm:flex" onMouseLeave={() => setHoverIso(null)}>
             <div className="flex-1 flex flex-col">
               <div className="flex items-center justify-between mb-1">
                 <button
                   type="button"
-                  onClick={() => {
-                    const prev = deslocarMes(anoEsquerda, mesEsquerda, -1)
-                    setAnoEsquerda(prev.ano)
-                    setMesEsquerda(prev.mes0)
-                  }}
+                  onClick={irParaMesAnterior}
+                  aria-label="Mês anterior"
                   className="w-7 h-7 flex items-center justify-center rounded-lg bg-surface-container-low text-outline hover:text-primary hover:bg-surface-container-high transition-colors"
                 >
                   <span className="material-symbols-outlined text-base">chevron_left</span>
                 </button>
-                <span className="sm:hidden text-xs text-on-surface-variant">Mês inicial</span>
                 <span className="w-7 h-7" />
               </div>
               <MesCalendario
@@ -218,19 +311,15 @@ export function DateRangeField({
               />
             </div>
 
-            <div className="hidden sm:block w-px bg-outline-variant/15 mx-3" />
+            <div className="w-px bg-outline-variant/15 mx-3" />
 
             <div className="flex-1 flex flex-col">
               <div className="flex items-center justify-between mb-1">
                 <span className="w-7 h-7" />
-                <span className="sm:hidden text-xs text-on-surface-variant">Mês seguinte</span>
                 <button
                   type="button"
-                  onClick={() => {
-                    const next = deslocarMes(anoEsquerda, mesEsquerda, 1)
-                    setAnoEsquerda(next.ano)
-                    setMesEsquerda(next.mes0)
-                  }}
+                  onClick={irParaProximoMes}
+                  aria-label="Próximo mês"
                   className="w-7 h-7 flex items-center justify-center rounded-lg bg-surface-container-low text-outline hover:text-primary hover:bg-surface-container-high transition-colors"
                 >
                   <span className="material-symbols-outlined text-base">chevron_right</span>
@@ -249,8 +338,8 @@ export function DateRangeField({
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-3 mt-4 pt-3 border-t border-outline-variant/10">
-            <div className="flex items-center gap-2 text-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4 pt-3 border-t border-outline-variant/10">
+            <div className="flex items-center justify-center sm:justify-start gap-2 text-xs">
               <span className="bg-surface-container-low rounded-lg px-2.5 py-1.5 text-on-surface font-semibold min-w-[76px] text-center">
                 {formatarDataBR(pendenteDe) || 'Início'}
               </span>
@@ -263,21 +352,21 @@ export function DateRangeField({
               <button
                 type="button"
                 onClick={limpar}
-                className="text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors px-2"
+                className="text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors px-2 shrink-0"
               >
                 Limpar
               </button>
               <button
                 type="button"
                 onClick={cancelar}
-                className="rounded-lg bg-surface-container-high text-secondary text-xs font-semibold py-2 px-3.5 hover:bg-surface-container-highest transition-colors"
+                className="flex-1 sm:flex-none rounded-lg bg-surface-container-high text-secondary text-xs font-semibold py-2 px-3.5 hover:bg-surface-container-highest transition-colors"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={aplicar}
-                className="rounded-lg bg-primary text-on-primary text-xs font-semibold py-2 px-3.5 hover:bg-primary-container transition-colors"
+                className="flex-1 sm:flex-none rounded-lg bg-primary text-on-primary text-xs font-semibold py-2 px-3.5 hover:bg-primary-container transition-colors"
               >
                 Aplicar
               </button>
