@@ -25,7 +25,7 @@ type StatusExtra = { status_final: string; data_protocolo: string | null; observ
 
 type Linha = SolicitacaoImportada & { report_medico_status: StatusExtra | null }
 
-type SortKey = 'data_solicitacao' | 'data_protocolo'
+type SortKey = 'data_solicitacao' | 'data_protocolo' | 'data_cirurgia'
 
 type Filtros = {
   representantes: string[]
@@ -218,9 +218,15 @@ export function ReportMedicoPage() {
 
   const ordenadas = useMemo(() => {
     const copia = [...filtradas]
+    const valorOrdenacao = (r: Linha): string =>
+      (sortKey === 'data_solicitacao'
+        ? r.data_solicitacao
+        : sortKey === 'data_protocolo'
+          ? dataProtocoloDe(r)
+          : r.data_cirurgia) ?? ''
     copia.sort((a, b) => {
-      const va = (sortKey === 'data_solicitacao' ? a.data_solicitacao : dataProtocoloDe(a)) ?? ''
-      const vb = (sortKey === 'data_solicitacao' ? b.data_solicitacao : dataProtocoloDe(b)) ?? ''
+      const va = valorOrdenacao(a)
+      const vb = valorOrdenacao(b)
       if (va === vb) return 0
       const menor = va < vb
       return sortDir === 'desc' ? (menor ? 1 : -1) : menor ? -1 : 1
@@ -466,6 +472,23 @@ export function ReportMedicoPage() {
                     )}
                   </span>
                 </th>
+                <th
+                  className={`px-4 py-3 font-headline font-bold text-[11px] uppercase tracking-widest cursor-pointer select-none whitespace-nowrap transition-colors ${
+                    sortKey === 'data_cirurgia'
+                      ? 'text-primary-container bg-primary-container/10'
+                      : 'text-on-surface-variant hover:text-primary'
+                  }`}
+                  onClick={() => alternarOrdenacao('data_cirurgia')}
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Cirurgia
+                    {sortKey === 'data_cirurgia' && (
+                      <span className="material-symbols-outlined text-[14px]">
+                        {sortDir === 'desc' ? 'arrow_downward' : 'arrow_upward'}
+                      </span>
+                    )}
+                  </span>
+                </th>
                 <th className="px-4 py-3 font-headline font-bold text-[11px] text-on-surface-variant uppercase tracking-widest">
                   Status Final
                 </th>
@@ -477,7 +500,7 @@ export function ReportMedicoPage() {
             <tbody className="divide-y divide-surface-container-high">
               {visiveis.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-8 text-center text-sm text-on-surface-variant">
+                  <td colSpan={9} className="px-6 py-8 text-center text-sm text-on-surface-variant">
                     {linhas.length === 0
                       ? 'Nenhuma solicitação importada ainda.'
                       : 'Nenhum registro encontrado para os filtros selecionados.'}
@@ -513,6 +536,9 @@ export function ReportMedicoPage() {
                     </td>
                     <td className="px-4 py-3 text-sm text-on-surface-variant whitespace-nowrap">
                       {formatDataBR(dataProtocoloDe(r))}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-on-surface-variant whitespace-nowrap">
+                      {formatDataBR(r.data_cirurgia)}
                     </td>
                     <td className="px-4 py-3">
                       <span

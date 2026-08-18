@@ -20,10 +20,9 @@ export function SideNavBar({ onNovaSolicitacao }: { onNovaSolicitacao: () => voi
   }
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors duration-150 ${
-      isActive
-        ? 'bg-surface-container-lowest text-primary-container font-semibold shadow-sm'
-        : 'text-on-surface-variant hover:bg-surface-container-high/60 font-medium'
+    `flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors duration-150 ${isActive
+      ? 'bg-surface-container-lowest text-primary-container font-semibold shadow-sm'
+      : 'text-on-surface-variant hover:bg-surface-container-high/60 font-medium'
     }`
 
   return (
@@ -73,19 +72,13 @@ export function SideNavBar({ onNovaSolicitacao }: { onNovaSolicitacao: () => voi
           onClick={handleNovaSolicitacaoClick}
           aria-disabled={actionItem.kind === 'action' ? actionItem.disabled : undefined}
           title={actionItem.kind === 'action' && actionItem.disabled ? actionItem.disabledReason : undefined}
-          className={`mt-auto mx-2 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-opacity ${
-            actionItem.kind === 'action' && actionItem.disabled
+          className={`mt-auto mx-2 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-opacity ${actionItem.kind === 'action' && actionItem.disabled
               ? 'bg-surface-container-high text-outline cursor-not-allowed'
               : 'bg-gradient-to-r from-primary-container to-primary text-on-primary shadow-md hover:opacity-90'
-          }`}
+            }`}
         >
           <span className="material-symbols-outlined text-[18px]">{actionItem.icon}</span>
           {actionItem.label}
-          {actionItem.kind === 'action' && actionItem.disabled && (
-            <span className="text-[10px] font-semibold uppercase tracking-wide">
-              ({actionItem.disabledReason})
-            </span>
-          )}
         </button>
       )}
     </aside>
