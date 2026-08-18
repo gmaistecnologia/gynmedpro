@@ -13,6 +13,7 @@ import {
   statusIconeClasse,
   statusFinalIcone,
 } from '../lib/reportMedicoStatus'
+import { componentesIso, deslocarMes, hojeIso, paraIso } from '../lib/dateUtils'
 import type { SolicitacaoImportada } from '../lib/types'
 
 const TAMANHO_PAGINA = 50
@@ -44,21 +45,32 @@ type Filtros = {
   observacoes: string
 }
 
-const FILTROS_VAZIOS: Filtros = {
-  representantes: [],
-  procedimentos: [],
-  convenios: [],
-  hospitais: [],
-  pacientes: [],
-  medicos: [],
-  statusFinal: [],
-  dataSolicitacaoDe: '',
-  dataSolicitacaoAte: '',
-  dataProtocoloDe: '',
-  dataProtocoloAte: '',
-  dataAutorizacaoDe: '',
-  dataAutorizacaoAte: '',
-  observacoes: '',
+// Padrão da tela: "Data Solicitação" já vem preenchida com o mês atual + 4 meses anteriores
+// (5 meses no total), em vez de carregar o histórico inteiro em aberto.
+function periodoSolicitacaoPadrao(): { de: string; ate: string } {
+  const hoje = componentesIso(hojeIso())
+  const inicio = deslocarMes(hoje.ano, hoje.mes0, -4)
+  return { de: paraIso(inicio.ano, inicio.mes0, 1), ate: hojeIso() }
+}
+
+function filtrosVazios(): Filtros {
+  const { de, ate } = periodoSolicitacaoPadrao()
+  return {
+    representantes: [],
+    procedimentos: [],
+    convenios: [],
+    hospitais: [],
+    pacientes: [],
+    medicos: [],
+    statusFinal: [],
+    dataSolicitacaoDe: de,
+    dataSolicitacaoAte: ate,
+    dataProtocoloDe: '',
+    dataProtocoloAte: '',
+    dataAutorizacaoDe: '',
+    dataAutorizacaoAte: '',
+    observacoes: '',
+  }
 }
 
 function statusFinalDe(r: Linha): string {
@@ -120,7 +132,7 @@ function CampoIntervaloData({
 export function ReportMedicoPage() {
   const [linhas, setLinhas] = useState<Linha[]>([])
   const [loading, setLoading] = useState(true)
-  const [filtros, setFiltros] = useState<Filtros>(FILTROS_VAZIOS)
+  const [filtros, setFiltros] = useState<Filtros>(filtrosVazios)
   const [sortKey, setSortKey] = useState<SortKey>('data_solicitacao')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [pagina, setPagina] = useState(1)
@@ -148,7 +160,7 @@ export function ReportMedicoPage() {
   }
 
   function limparFiltros() {
-    setFiltros(FILTROS_VAZIOS)
+    setFiltros(filtrosVazios())
   }
 
   const opcoes = useMemo(() => {
