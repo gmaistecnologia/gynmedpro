@@ -20,6 +20,7 @@ import { MonthReferenceSelect } from '../components/ui/MonthReferenceSelect'
 import { MultiSelectField } from '../components/ui/MultiSelectField'
 import { PerformanceRepresentanteTable } from '../components/relatorios/PerformanceRepresentanteTable'
 import { PipelineComercialTable } from '../components/relatorios/PipelineComercialTable'
+import { useProfilesDirectory } from '../hooks/useProfilesDirectory'
 import type { SolicitacaoImportada, MetaComercial, MetaRepresentante } from '../lib/types'
 
 const BRAND = '#1271d8'
@@ -92,6 +93,7 @@ function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
 
 export function RelatoriosPage() {
   const { profile } = useAuth()
+  const { porNome: perfisPorNome } = useProfilesDirectory()
   const [solicitacoes, setSolicitacoes] = useState<SolicitacaoImportada[]>([])
   const [metas, setMetas] = useState<MetaComercial[]>([])
   const [metasRep, setMetasRep] = useState<MetaRepresentante[]>([])
@@ -432,6 +434,7 @@ export function RelatoriosPage() {
           metasRep={metasRep}
           mesReferencia={mesReferencia}
           mesLabel={mesLabel(mesReferencia || mesRefAtual())}
+          inativos={perfisPorNome}
         />
       )}
 

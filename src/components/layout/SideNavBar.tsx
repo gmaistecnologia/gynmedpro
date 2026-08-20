@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useAuth } from '../../lib/auth'
-import { REPRESENTANTE_ITEMS, GESTOR_ITEMS, ADMIN_ITEMS } from './nav-items'
+import { REPRESENTANTE_ITEMS, GESTOR_ITEMS, ADMIN_ITEMS, PERFIL_ITEM } from './nav-items'
 
 export function SideNavBar({ onNovaSolicitacao }: { onNovaSolicitacao: () => void }) {
   const { profile } = useAuth()
@@ -63,6 +63,13 @@ export function SideNavBar({ onNovaSolicitacao }: { onNovaSolicitacao: () => voi
             ))}
           </>
         )}
+
+        {/* "Perfil" é comum a todos os papéis, por isso vem à parte dos itens por papel acima. */}
+        <div className="my-2 border-t border-outline-variant/10" />
+        <NavLink to={PERFIL_ITEM.to} className={linkClass}>
+          <span className="material-symbols-outlined text-[20px] shrink-0">{PERFIL_ITEM.icon}</span>
+          <span className="truncate">{PERFIL_ITEM.label}</span>
+        </NavLink>
       </nav>
 
       {/* Único ponto de entrada para "Nova Solicitação": botão fixo no rodapé da sidebar, não duplicado na lista de navegação. */}

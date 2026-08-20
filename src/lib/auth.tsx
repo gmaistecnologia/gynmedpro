@@ -1,34 +1,49 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
+import { toast } from 'sonner'
 import { supabase } from './supabase'
-import type { Profile } from './types'
+import type { ProfileCompleto } from './types'
 
 type AuthContextValue = {
   session: Session | null
-  profile: Profile | null
+  profile: ProfileCompleto | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
+  refreshProfile: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
-  const [profile, setProfile] = useState<Profile | null>(null)
+  const [profile, setProfile] = useState<ProfileCompleto | null>(null)
   const [loading, setLoading] = useState(true)
+  const userIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     let active = true
 
     async function loadProfile(userId: string) {
       const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
-      if (active) setProfile(data)
+      if (!active) return
+      const perfil = data as ProfileCompleto | null
+      // Conta inativada pelo admin: não deixa a sessão em pé, mesmo que o token ainda seja
+      // válido — a "Sinalização de usuário inativo" (ver Configurações > Usuários) também
+      // revoga o login no Supabase Auth, isto aqui cobre a sessão já aberta no navegador.
+      if (perfil && perfil.ativo === false) {
+        setProfile(null)
+        await supabase.auth.signOut()
+        toast.error('Sua conta foi desativada. Fale com o administrador.')
+        return
+      }
+      setProfile(perfil)
     }
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!active) return
       setSession(session)
+      userIdRef.current = session?.user.id ?? null
       if (session) {
         loadProfile(session.user.id).finally(() => active && setLoading(false))
       } else {
@@ -39,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!active) return
       setSession(session)
+      userIdRef.current = session?.user.id ?? null
       if (session) {
         loadProfile(session.user.id)
       } else {
@@ -61,8 +77,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut()
   }
 
+  async function refreshProfile() {
+    const userId = userIdRef.current
+    if (!userId) return
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
+    setProfile(data as ProfileCompleto | null)
+  }
+
   return (
-    <AuthContext.Provider value={{ session, profile, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ session, profile, loading, signIn, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   )

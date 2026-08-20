@@ -207,22 +207,31 @@ export type Database = {
       }
       profiles: {
         Row: {
+          ativo: boolean
+          avatar_url: string | null
           comissao_padrao: number | null
           criado_em: string
+          email: string | null
           id: string
           nome: string
           role: string
         }
         Insert: {
+          ativo?: boolean
+          avatar_url?: string | null
           comissao_padrao?: number | null
           criado_em?: string
+          email?: string | null
           id: string
           nome: string
           role?: string
         }
         Update: {
+          ativo?: boolean
+          avatar_url?: string | null
           comissao_padrao?: number | null
           criado_em?: string
+          email?: string | null
           id?: string
           nome?: string
           role?: string
@@ -464,6 +473,7 @@ export type Database = {
     }
     Functions: {
       get_my_role: { Args: never; Returns: string }
+      is_admin: { Args: never; Returns: boolean }
       upsert_solicitacoes_importadas: { Args: { linhas: Json }; Returns: Json }
     }
     Enums: {

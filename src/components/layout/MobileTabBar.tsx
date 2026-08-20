@@ -1,14 +1,15 @@
 import { NavLink } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useAuth } from '../../lib/auth'
-import { REPRESENTANTE_ITEMS, GESTOR_ITEMS, ADMIN_ITEMS } from './nav-items'
+import { REPRESENTANTE_ITEMS, GESTOR_ITEMS, ADMIN_ITEMS, PERFIL_ITEM } from './nav-items'
 
 export function MobileTabBar({ onNovaSolicitacao }: { onNovaSolicitacao: () => void }) {
   const { profile } = useAuth()
   const baseItems = profile?.role === 'representante' ? REPRESENTANTE_ITEMS : GESTOR_ITEMS
   const withAdmin = profile?.role === 'admin' ? [...baseItems, ...ADMIN_ITEMS] : baseItems
   // Barra de abas não tem espaço para submenus: achata grupos (ex. "Relatórios") em abas soltas.
-  const items = withAdmin.flatMap((item) => (item.kind === 'group' ? item.items : [item]))
+  // "Perfil" é comum a todos os papéis, então entra sempre por último.
+  const items = [...withAdmin.flatMap((item) => (item.kind === 'group' ? item.items : [item])), PERFIL_ITEM]
 
   const tabClass = ({ isActive }: { isActive: boolean }) =>
     `flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-medium min-w-0 ${

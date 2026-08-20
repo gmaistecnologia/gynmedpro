@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useState } from 'react'
 import { Card } from '../ui/Card'
-import type { MetaComercial, MetaRepresentante, SolicitacaoImportada } from '../../lib/types'
+import { UsuarioInativoBadge } from '../ui/UsuarioInativoBadge'
+import type { MetaComercial, MetaRepresentante, ProfileCompleto, SolicitacaoImportada } from '../../lib/types'
 
 const SITUACOES_REALIZADAS = ['Faturado', 'Cirurgia realizada']
 
@@ -62,12 +63,15 @@ export function PerformanceRepresentanteTable({
   metasRep,
   mesReferencia,
   mesLabel,
+  inativos,
 }: {
   solicitacoes: SolicitacaoImportada[]
   meta: MetaComercial | undefined
   metasRep: MetaRepresentante[]
   mesReferencia: string
   mesLabel: string
+  /** Cadastro de perfis por nome (ver useProfilesDirectory), pra sinalizar representante inativo. */
+  inativos?: Map<string, Pick<ProfileCompleto, 'ativo'>>
 }) {
   const [sortKey, setSortKey] = useState<SortKey>('fechParcial')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
@@ -241,8 +245,9 @@ export function PerformanceRepresentanteTable({
                             {rep.medicos.length === 0 ? '' : expandido ? 'arrow_drop_down' : 'arrow_right'}
                           </span>
                           <span className="min-w-0">
-                            <span className="block text-sm font-bold text-on-surface uppercase truncate">
-                              {rep.nome}
+                            <span className="flex items-center gap-1.5">
+                              <span className="text-sm font-bold text-on-surface uppercase truncate">{rep.nome}</span>
+                              {inativos?.get(rep.nome)?.ativo === false && <UsuarioInativoBadge />}
                             </span>
                             <span className="mt-1 block h-1 w-40 max-w-full rounded-full bg-surface-container-high overflow-hidden">
                               <span

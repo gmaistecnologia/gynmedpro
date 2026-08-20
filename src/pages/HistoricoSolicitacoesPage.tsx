@@ -4,7 +4,9 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { Card } from '../components/ui/Card'
 import { StatusBadge } from '../components/ui/StatusBadge'
+import { UsuarioInativoBadge } from '../components/ui/UsuarioInativoBadge'
 import { MultiSelectField } from '../components/ui/MultiSelectField'
+import { useProfilesDirectory } from '../hooks/useProfilesDirectory'
 import { SolicitacaoDetailModal } from '../components/solicitacoes/SolicitacaoDetailModal'
 import { StatusFinalEditavel } from '../components/relatorios/StatusFinalEditavel'
 import { ProtocoloDateInput, ObservacaoInputCompacto } from '../components/relatorios/CamposAcompanhamentoEditaveis'
@@ -62,6 +64,7 @@ export function HistoricoSolicitacoesPage() {
   const [selecionadaId, setSelecionadaId] = useState<string | null>(null)
 
   const isGestor = profile?.role === 'gerente_comercial' || profile?.role === 'admin'
+  const { porNome: perfisPorNome } = useProfilesDirectory()
 
   // Debounce da busca por texto — evita 1 request por tecla digitada.
   useEffect(() => {
@@ -268,8 +271,13 @@ export function HistoricoSolicitacoesPage() {
                       <StatusBadge status={s.situacao ?? '—'} />
                     </td>
                     {isGestor && (
-                      <td className="px-4 py-2.5 text-xs text-on-surface-variant truncate max-w-[160px]">
-                        {s.representante_nome ?? '—'}
+                      <td className="px-4 py-2.5 text-xs text-on-surface-variant max-w-[160px]">
+                        <span className="flex items-center gap-1.5">
+                          <span className="truncate">{s.representante_nome ?? '—'}</span>
+                          {s.representante_nome && perfisPorNome.get(s.representante_nome)?.ativo === false && (
+                            <UsuarioInativoBadge />
+                          )}
+                        </span>
                       </td>
                     )}
                     <td className="px-4 py-2.5 text-xs text-on-surface-variant truncate max-w-[160px]">

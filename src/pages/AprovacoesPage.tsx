@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
+import { UsuarioInativoBadge } from '../components/ui/UsuarioInativoBadge'
 import type { SolicitacaoComRelacoes } from '../lib/types'
 
 export function AprovacoesPage() {
@@ -18,7 +19,7 @@ export function AprovacoesPage() {
     setLoading(true)
     const { data } = await supabase
       .from('solicitacoes_cirurgicas')
-      .select('*, hospitais(id, nome_fantasia, cidade, uf), profiles(id, nome), itens_solicitados(*, produtos(*))')
+      .select('*, hospitais(id, nome_fantasia, cidade, uf), profiles(id, nome, ativo), itens_solicitados(*, produtos(*))')
       .eq('status', 'enviado')
       .order('data_cirurgia', { ascending: true })
     setSolicitacoes((data as SolicitacaoComRelacoes[]) ?? [])
@@ -89,10 +90,13 @@ export function AprovacoesPage() {
                 <p className="text-sm text-on-surface-variant truncate">
                   {s.medico_cirurgiao} · {s.hospitais?.nome_fantasia}
                 </p>
-                <p className="text-xs text-on-surface-variant truncate">
-                  {s.data_cirurgia ? format(new Date(s.data_cirurgia), "dd/MM/yyyy 'às' HH:mm") : 'Data a definir'} ·
-                  Representante: {s.profiles?.nome} · {s.itens_solicitados.length}{' '}
-                  {s.itens_solicitados.length === 1 ? 'item' : 'itens'}
+                <p className="text-xs text-on-surface-variant truncate flex items-center flex-wrap gap-x-1.5 gap-y-1">
+                  <span>
+                    {s.data_cirurgia ? format(new Date(s.data_cirurgia), "dd/MM/yyyy 'às' HH:mm") : 'Data a definir'} ·
+                    Representante: {s.profiles?.nome} · {s.itens_solicitados.length}{' '}
+                    {s.itens_solicitados.length === 1 ? 'item' : 'itens'}
+                  </span>
+                  {s.profiles?.ativo === false && <UsuarioInativoBadge />}
                 </p>
               </div>
               <div className="flex items-center gap-3 shrink-0">

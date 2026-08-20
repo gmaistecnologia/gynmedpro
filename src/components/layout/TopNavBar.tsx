@@ -1,5 +1,6 @@
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../lib/auth'
+import { Avatar } from '../ui/Avatar'
 
 export function TopNavBar() {
   const { profile, signOut } = useAuth()
@@ -22,13 +23,15 @@ export function TopNavBar() {
         </span>
       </div>
       <div className="flex items-center gap-3 sm:gap-4 shrink-0">
-        <div className="hidden sm:flex flex-col items-end leading-tight">
-          <span className="text-sm font-bold text-on-surface">{profile?.nome}</span>
-          <span className="text-[11px] text-outline uppercase tracking-wide">{profile?.role.replace('_', ' ')}</span>
-        </div>
-        <div className="w-9 h-9 rounded-full bg-primary-container flex items-center justify-center text-on-primary font-bold text-sm shrink-0">
-          {profile?.nome?.slice(0, 2).toUpperCase()}
-        </div>
+        <Link to="/perfil" className="flex items-center gap-3 sm:gap-4 group" title="Meu perfil">
+          <div className="hidden sm:flex flex-col items-end leading-tight">
+            <span className="text-sm font-bold text-on-surface group-hover:text-primary transition-colors">
+              {profile?.nome}
+            </span>
+            <span className="text-[11px] text-outline uppercase tracking-wide">{profile?.role.replace('_', ' ')}</span>
+          </div>
+          <Avatar nome={profile?.nome} avatarUrl={profile?.avatar_url} />
+        </Link>
         <button
           onClick={handleSignOut}
           className="p-2 text-outline hover:text-error hover:bg-error-container/40 rounded-lg transition-colors shrink-0"

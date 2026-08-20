@@ -44,3 +44,7 @@ export const ADMIN_ITEMS: LinkNavItem[] = [
   { kind: 'link', to: '/importar', label: 'Importar Planilha', icon: 'upload_file' },
   { kind: 'link', to: '/configuracoes', label: 'Configurações', icon: 'settings' },
 ]
+
+// Comum a todos os papéis — por isso fica fora dos arrays acima em vez de duplicado em cada
+// um. As barras de navegação anexam este item ao final da própria lista renderizada.
+export const PERFIL_ITEM: LinkNavItem = { kind: 'link', to: '/perfil', label: 'Perfil', icon: 'account_circle' }

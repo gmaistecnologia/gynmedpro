@@ -12,6 +12,7 @@ import { RelatoriosPage } from './pages/RelatoriosPage'
 import { ReportMedicoPage } from './pages/ReportMedicoPage'
 import { ImportarPlanilhaPage } from './pages/ImportarPlanilhaPage'
 import { ConfiguracoesPage } from './pages/ConfiguracoesPage'
+import { PerfilPage } from './pages/PerfilPage'
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
               <Route path="/" element={<RoleHomeRedirect />} />
+              <Route path="/perfil" element={<PerfilPage />} />
 
               <Route element={<RequireRole roles={['representante']} />}>
                 <Route path="/dashboard" element={<RepresentanteDashboardPage />} />
