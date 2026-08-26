@@ -136,7 +136,14 @@ Deno.serve(async (req) => {
     })
     if (banError) return jsonResponse({ error: 'Não foi possível atualizar o acesso do usuário.' }, 500)
 
-    const { error: updateError } = await adminClient.from('profiles').update({ ativo }).eq('id', id)
+    // `callerClient`, não `adminClient`: o trigger `profiles_guard_privileged_columns` (migração
+    // perfil_e_gestao_de_usuarios) reverte `ativo`/`role`/`email`/`comissao_padrao` sempre que
+    // `is_admin()` dá falso — e `is_admin()` lê `auth.uid()`, que é NULL numa requisição feita
+    // com a service_role key (não carrega usuário nenhum). Com a service_role, esse UPDATE
+    // retornava sucesso mas o trigger desfazia a mudança na hora — a coluna nunca mudava de
+    // verdade, mesmo o ban acima funcionando. `callerClient` carrega o JWT do admin que chamou
+    // (já validado como admin logo no início desta function), então passa no `is_admin()`.
+    const { error: updateError } = await callerClient.from('profiles').update({ ativo }).eq('id', id)
     if (updateError) return jsonResponse({ error: 'Não foi possível atualizar o status do usuário.' }, 500)
 
     return jsonResponse({ ok: true })
@@ -170,7 +177,9 @@ Deno.serve(async (req) => {
     }
 
     if (emailLimpo) {
-      const { error: profileError } = await adminClient.from('profiles').update({ email: emailLimpo }).eq('id', id)
+      // callerClient pelo mesmo motivo do set-active acima: adminClient (service_role) faz
+      // auth.uid() virar NULL, e o trigger de proteção reverte `email` de volta ao valor antigo.
+      const { error: profileError } = await callerClient.from('profiles').update({ email: emailLimpo }).eq('id', id)
       if (profileError) {
         return jsonResponse({ error: 'E-mail alterado no login, mas falhou ao salvar no perfil.' }, 500)
       }

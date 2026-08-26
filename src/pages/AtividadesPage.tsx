@@ -30,6 +30,20 @@ type Filtros = {
   busca: string
 }
 
+// Espelha os mesmos critérios da consulta ao servidor (efeito acima), pra decidir se um evento
+// que chega ao vivo pertence à visão filtrada atual antes de injetá-lo na lista — sem isso, o
+// realtime mostrava a atividade de QUALQUER usuário mesmo com o filtro de Usuário/Tipo/Período/
+// Paciente restringindo a tela a outra pessoa.
+function logCombinaComFiltros(log: AtividadeLog, filtros: Filtros): boolean {
+  if (filtros.usuarios.length && !(log.usuario_id && filtros.usuarios.includes(log.usuario_id))) return false
+  if (filtros.tipos.length && !filtros.tipos.includes(log.tipo)) return false
+  const criadoEm = new Date(log.criado_em).getTime()
+  if (filtros.de && criadoEm < new Date(`${filtros.de}T00:00:00`).getTime()) return false
+  if (filtros.ate && criadoEm > new Date(`${filtros.ate}T23:59:59.999`).getTime()) return false
+  if (filtros.busca && !(log.paciente_nome ?? '').toLowerCase().includes(filtros.busca.toLowerCase())) return false
+  return true
+}
+
 function filtrosPadrao(): Filtros {
   // Últimos 30 dias: janela suficiente para auditar a operação do mês sem puxar o log inteiro.
   return { usuarios: [], tipos: [], de: adicionarDiasIso(hojeIso(), -29), ate: hojeIso(), busca: '' }
@@ -136,6 +150,7 @@ export function AtividadesPage() {
       .channel('atividades-log-feed')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'atividades_log' }, (payload) => {
         const nova = payload.new as AtividadeLog
+        if (!logCombinaComFiltros(nova, filtros)) return
         if (pagina !== 1) {
           setNovasAoVivo((n) => n + 1)
           return
@@ -151,7 +166,7 @@ export function AtividadesPage() {
     return () => {
       supabase.removeChannel(canal)
     }
-  }, [pagina])
+  }, [pagina, filtros])
 
   const opcoesUsuarios = useMemo(
     () => usuarios.map((u) => ({ value: u.id, label: u.nome })),

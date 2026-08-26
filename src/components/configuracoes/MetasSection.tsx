@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
 import { SearchableSelect } from '../ui/SearchableSelect'
+import { MonthPickerField } from '../ui/MonthPickerField'
 import type { MetaComercial, MetaRepresentante } from '../../lib/types'
 
 const MESES_ABREV = [
@@ -271,12 +272,7 @@ export function MetasSection() {
         <div className="flex flex-wrap items-end gap-4">
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-bold text-outline uppercase tracking-wide ml-1">Mês de referência</label>
-            <input
-              type="month"
-              value={novoMes}
-              onChange={(e) => setNovoMes(e.target.value)}
-              className="bg-surface-container-low border border-outline-variant/20 rounded-lg text-sm py-2.5 px-3 focus:ring-2 focus:ring-primary/10 focus:border-primary"
-            />
+            <MonthPickerField value={novoMes} onChange={setNovoMes} />
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-bold text-outline uppercase tracking-wide ml-1">Valor da meta (R$)</label>
@@ -458,12 +454,7 @@ export function MetasSection() {
         <div className="flex flex-wrap items-end gap-4">
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-bold text-outline uppercase tracking-wide ml-1">Mês de referência</label>
-            <input
-              type="month"
-              value={novoMesRep}
-              onChange={(e) => setNovoMesRep(e.target.value)}
-              className="bg-surface-container-low border border-outline-variant/20 rounded-lg text-sm py-2.5 px-3 focus:ring-2 focus:ring-primary/10 focus:border-primary"
-            />
+            <MonthPickerField value={novoMesRep} onChange={setNovoMesRep} />
           </div>
           <div className="flex flex-col gap-1.5 min-w-[220px]">
             <label className="text-xs font-bold text-outline uppercase tracking-wide ml-1">Representante</label>

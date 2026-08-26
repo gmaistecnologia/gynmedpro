@@ -15,6 +15,7 @@ import {
   statusFinalIcone,
 } from '../lib/reportMedicoStatus'
 import { alertaProtocolo, CLASSE_LINHA_ALERTA, LIMITE_DIAS_PROTOCOLADO, type Alerta } from '../lib/alertas'
+import { exportarReportMedicoExcel } from '../lib/exportReportMedico'
 import { useReportMedicoStatusRealtime } from '../hooks/useReportMedicoStatusRealtime'
 import { componentesIso, deslocarMes, hojeIso, paraIso } from '../lib/dateUtils'
 import type { SolicitacaoImportada } from '../lib/types'
@@ -193,6 +194,24 @@ export function ReportMedicoPage() {
   // plano. Filtros mais amplos que a janela padrão (ex.: limpar "Data Solicitação") podem
   // mostrar resultado incompleto até essa flag virar false — daí o aviso na UI.
   const [carregandoRestante, setCarregandoRestante] = useState(false)
+  const [exportando, setExportando] = useState(false)
+
+  // "Exportar Tudo" busca a tabela inteira direto do banco, sem respeitar filtro/paginação da
+  // tela — é a proposta do botão. Por isso não reaproveita `linhas` (que pode estar filtrada
+  // pela janela padrão de carregamento, ver efeito de montagem mais abaixo).
+  async function exportarTudo() {
+    if (exportando) return
+    setExportando(true)
+    const toastId = toast.loading('Exportando Report Médico completo…')
+    try {
+      const { registros } = await exportarReportMedicoExcel()
+      toast.success(`Exportação concluída — ${registros} registros.`, { id: toastId })
+    } catch {
+      toast.error('Não foi possível exportar o Report Médico. Tente novamente.', { id: toastId })
+    } finally {
+      setExportando(false)
+    }
+  }
 
   // O cabeçalho da Card (título + contador) e a linha de títulos da tabela grudam juntos no topo
   // da janela. Como os dois são sticky, o segundo precisa saber a altura exata do primeiro —
@@ -399,11 +418,25 @@ export function ReportMedicoPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="font-headline font-bold text-3xl text-secondary tracking-tight">Report Médico</h1>
-        <p className="text-on-surface-variant mt-1 text-sm">
-          Acompanhamento das solicitações por status, do pedido inicial à cirurgia realizada.
-        </p>
+      <header className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+          <h1 className="font-headline font-bold text-3xl text-secondary tracking-tight">Report Médico</h1>
+          <p className="text-on-surface-variant mt-1 text-sm">
+            Acompanhamento das solicitações por status, do pedido inicial à cirurgia realizada.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={exportarTudo}
+          disabled={exportando}
+          title="Exporta todos os registros do Report Médico em .xlsx, ignorando os filtros da tela"
+          className="inline-flex items-center gap-2 bg-surface-container-high text-secondary hover:bg-surface-container-highest disabled:opacity-60 disabled:cursor-not-allowed rounded-lg text-sm font-semibold py-2.5 px-5 h-[46px] transition-colors shrink-0"
+        >
+          <span className={`material-symbols-outlined text-[18px] ${exportando ? 'animate-spin' : ''}`}>
+            {exportando ? 'progress_activity' : 'download'}
+          </span>
+          {exportando ? 'Exportando…' : 'Exportar Tudo'}
+        </button>
       </header>
 
       <Card className="p-5 flex flex-col gap-4">
