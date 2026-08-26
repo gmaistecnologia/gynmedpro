@@ -8,10 +8,33 @@ export type StatusExtra = { status_final: string; data_protocolo: string | null;
 // Upsert único usado por toda tela que edita o acompanhamento do Report Médico
 // (hoje: detalhe da solicitação, em página cheia ou modal) — a chave é sempre a
 // própria solicitação, nunca o Report Médico, que passou a ser somente leitura.
-export function salvarReportMedicoStatus(solicitacaoId: string, patch: Partial<StatusExtra>) {
+//
+// IMPORTANTE: recebe sempre o trio completo (status_final, data_protocolo, observacoes), nunca
+// um patch parcial. Confirmado em produção em 26/08/2026: um upsert de coluna única (ex.: só
+// `status_final`) faz o PostgREST gravar NULL nas colunas ausentes do corpo da requisição mesmo
+// ao mesclar com uma linha já existente — ou seja, mudar só o Status Final apagava silenciosamente
+// a Data Protocolo e as Observações da linha (e vice-versa). Isso só ficou visível quando a
+// constraint `report_medico_status_protocolado_exige_data` passou a rejeitar o caso óbvio
+// (status PROTOCOLADO + data apagada), mas o mesmo apagamento acontecia sem aviso pra qualquer
+// combinação de campos antes disso. Use `mesclarStatusExtra` para montar o objeto completo antes
+// de chamar esta função — nunca passe um patch parcial direto pra cá.
+export function salvarReportMedicoStatus(solicitacaoId: string, valores: StatusExtra) {
   return supabase
     .from('report_medico_status')
-    .upsert({ solicitacao_id: solicitacaoId, ...patch }, { onConflict: 'solicitacao_id' })
+    .upsert({ solicitacao_id: solicitacaoId, ...valores }, { onConflict: 'solicitacao_id' })
+}
+
+// Mescla o estado atual (o que já está salvo/otimisticamente em memória) com um patch parcial,
+// produzindo o trio completo que `salvarReportMedicoStatus` exige. Centralizado aqui porque toda
+// tela que edita o acompanhamento (detalhe da solicitação, lista de Solicitações) precisa do
+// mesmo merge antes de salvar.
+export function mesclarStatusExtra(atual: StatusExtra | null | undefined, patch: Partial<StatusExtra>): StatusExtra {
+  return {
+    status_final: statusFinalDe(atual),
+    data_protocolo: dataProtocoloDe(atual),
+    observacoes: observacoesDe(atual),
+    ...patch,
+  }
 }
 
 // Sem registro em report_medico_status, a solicitação ainda não foi tocada pelo time de

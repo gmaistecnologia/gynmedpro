@@ -114,7 +114,13 @@ function formatDataBR(iso: string | null): string {
   return `${dia}/${mes}/${ano}`
 }
 
-async function fetchTodasComStatus(): Promise<Linha[]> {
+// Página é carregada em duas etapas — ver o efeito de montagem mais abaixo. Primeiro só a janela
+// padrão (mesmos ~5 meses do filtro "Data Solicitação" que já vem preenchido), pra tela aparecer
+// rápido; o restante do histórico (10 mil+ linhas) entra depois, em segundo plano, sem bloquear
+// a primeira renderização. As duas funções abaixo pedem no servidor exatamente esse recorte —
+// nada de trazer a tabela inteira pra filtrar no cliente.
+
+async function fetchJanelaPadrao(de: string, ate: string): Promise<Linha[]> {
   const tamanhoLote = 1000
   let offset = 0
   const todas: Linha[] = []
@@ -122,6 +128,27 @@ async function fetchTodasComStatus(): Promise<Linha[]> {
     const { data, error } = await supabase
       .from('solicitacoes_importadas')
       .select(SELECT_COM_STATUS)
+      .gte('data_solicitacao', de)
+      .lte('data_solicitacao', ate)
+      .order('data_solicitacao', { ascending: false })
+      .range(offset, offset + tamanhoLote - 1)
+    if (error) throw error
+    todas.push(...((data as unknown as Linha[]) ?? []))
+    if (!data || data.length < tamanhoLote) break
+    offset += tamanhoLote
+  }
+  return todas
+}
+
+async function fetchForaDaJanelaPadrao(de: string, ate: string): Promise<Linha[]> {
+  const tamanhoLote = 1000
+  let offset = 0
+  const todas: Linha[] = []
+  for (;;) {
+    const { data, error } = await supabase
+      .from('solicitacoes_importadas')
+      .select(SELECT_COM_STATUS)
+      .or(`data_solicitacao.lt.${de},data_solicitacao.gt.${ate},data_solicitacao.is.null`)
       .order('data_solicitacao', { ascending: false })
       .range(offset, offset + tamanhoLote - 1)
     if (error) throw error
@@ -162,6 +189,10 @@ export function ReportMedicoPage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [pagina, setPagina] = useState(1)
   const [selecionadaId, setSelecionadaId] = useState<string | null>(null)
+  // true enquanto o restante do histórico (fora da janela padrão) ainda carrega em segundo
+  // plano. Filtros mais amplos que a janela padrão (ex.: limpar "Data Solicitação") podem
+  // mostrar resultado incompleto até essa flag virar false — daí o aviso na UI.
+  const [carregandoRestante, setCarregandoRestante] = useState(false)
 
   // O cabeçalho da Card (título + contador) e a linha de títulos da tabela grudam juntos no topo
   // da janela. Como os dois são sticky, o segundo precisa saber a altura exata do primeiro —
@@ -178,10 +209,42 @@ export function ReportMedicoPage() {
   }, [loading])
 
   useEffect(() => {
-    fetchTodasComStatus()
-      .then(setLinhas)
-      .catch(() => toast.error('Não foi possível carregar o Report Médico.'))
-      .finally(() => setLoading(false))
+    let cancelado = false
+    const { de, ate } = periodoSolicitacaoPadrao()
+
+    async function carregar() {
+      try {
+        const primeiraLeva = await fetchJanelaPadrao(de, ate)
+        if (cancelado) return
+        setLinhas(primeiraLeva)
+      } catch {
+        if (!cancelado) toast.error('Não foi possível carregar o Report Médico.')
+      } finally {
+        if (!cancelado) setLoading(false)
+      }
+
+      // Histórico fora da janela padrão, em segundo plano — a tela já está utilizável com a
+      // primeira leva. Sem isso, limpar/ampliar o filtro de Data Solicitação ficaria incompleto.
+      try {
+        setCarregandoRestante(true)
+        const resto = await fetchForaDaJanelaPadrao(de, ate)
+        if (cancelado) return
+        setLinhas((atual) => {
+          const idsExistentes = new Set(atual.map((l) => l.id))
+          return [...atual, ...resto.filter((l) => !idsExistentes.has(l.id))]
+        })
+      } catch {
+        // Silencioso: a janela padrão já carregou com sucesso; só filtros mais amplos ficam
+        // incompletos, não vale interromper o usuário com outro toast por isso.
+      } finally {
+        if (!cancelado) setCarregandoRestante(false)
+      }
+    }
+
+    carregar()
+    return () => {
+      cancelado = true
+    }
   }, [])
 
   // Mescla no lugar a linha que mudou, sem refazer a consulta inteira: a tela do gestor reflete
@@ -536,9 +599,20 @@ export function ReportMedicoPage() {
               Somente leitura — clique num paciente para editar Status Final, Protocolo e Observações
             </p>
           </div>
-          <span className="bg-inverse-surface text-inverse-on-surface text-[11px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wide shrink-0">
-            {ordenadas.length} de {linhas.length} registros
-          </span>
+          <div className="flex items-center gap-3 shrink-0">
+            {carregandoRestante && (
+              <span
+                className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-semibold text-on-surface-variant"
+                title="Os últimos ~5 meses já estão completos. Histórico mais antigo continua carregando — filtros de data mais amplos podem ficar incompletos até terminar."
+              >
+                <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
+                Carregando histórico completo…
+              </span>
+            )}
+            <span className="bg-inverse-surface text-inverse-on-surface text-[11px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wide">
+              {ordenadas.length} de {linhas.length} registros
+            </span>
+          </div>
         </div>
 
         <div className="overflow-x-auto lg:overflow-x-visible">

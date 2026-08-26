@@ -16,6 +16,7 @@ import {
   dataProtocoloDe,
   observacoesDe,
   motivoBloqueioPatch,
+  mesclarStatusExtra,
   statusIconeClasse,
   type StatusExtra,
 } from '../lib/reportMedicoStatus'
@@ -173,28 +174,19 @@ export function HistoricoSolicitacoesPage() {
       return
     }
 
+    const valores = mesclarStatusExtra(linha?.report_medico_status, patch)
     const anterior = solicitacoes
     setSolicitacoes((prev) =>
       prev.map((s) =>
-        s.id === solicitacaoId
-          ? {
-              ...s,
-              report_medico_status: {
-                status_final: statusFinalDe(s.report_medico_status),
-                data_protocolo: dataProtocoloDe(s.report_medico_status),
-                observacoes: observacoesDe(s.report_medico_status),
-                atualizado_em: null,
-                ...s.report_medico_status,
-                ...patch,
-              },
-            }
-          : s,
+        s.id === solicitacaoId ? { ...s, report_medico_status: { ...valores, atualizado_em: null } } : s,
       ),
     )
-    const { error } = await salvarReportMedicoStatus(solicitacaoId, patch)
+    const { error } = await salvarReportMedicoStatus(solicitacaoId, valores)
     if (error) {
       setSolicitacoes(anterior)
-      toast.error('Não foi possível salvar a alteração. Tente novamente.')
+      // A descrição traz o erro real do Postgres/PostgREST (ex.: constraint violada, RLS) — sem
+      // ela, um "tente novamente" genérico não dá pista nenhuma de por que falhou.
+      toast.error('Não foi possível salvar a alteração. Tente novamente.', { description: error.message })
     } else {
       toast.success('Registro atualizado.')
     }

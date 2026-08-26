@@ -3,10 +3,8 @@ import { toast } from 'sonner'
 import { supabase } from './supabase'
 import {
   salvarReportMedicoStatus,
-  statusFinalDe,
-  dataProtocoloDe,
-  observacoesDe,
   motivoBloqueioPatch,
+  mesclarStatusExtra,
   type StatusExtra,
 } from './reportMedicoStatus'
 import { useReportMedicoStatusRealtime } from '../hooks/useReportMedicoStatusRealtime'
@@ -58,22 +56,18 @@ export function useSolicitacaoDetail(id: string | null | undefined) {
       return
     }
 
+    const valores = mesclarStatusExtra(solicitacao.report_medico_status, patch)
     const anterior = solicitacao
     setSolicitacao({
       ...solicitacao,
-      report_medico_status: {
-        status_final: statusFinalDe(solicitacao.report_medico_status),
-        data_protocolo: dataProtocoloDe(solicitacao.report_medico_status),
-        observacoes: observacoesDe(solicitacao.report_medico_status),
-        atualizado_em: null,
-        ...solicitacao.report_medico_status,
-        ...patch,
-      },
+      report_medico_status: { ...valores, atualizado_em: null },
     })
-    const { error } = await salvarReportMedicoStatus(id, patch)
+    const { error } = await salvarReportMedicoStatus(id, valores)
     if (error) {
       setSolicitacao(anterior)
-      toast.error('Não foi possível salvar a alteração. Tente novamente.')
+      // A descrição traz o erro real do Postgres/PostgREST (ex.: constraint violada, RLS) — sem
+      // ela, um "tente novamente" genérico não dá pista nenhuma de por que falhou.
+      toast.error('Não foi possível salvar a alteração. Tente novamente.', { description: error.message })
     } else {
       toast.success('Registro atualizado.')
     }
