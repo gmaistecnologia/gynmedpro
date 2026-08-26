@@ -15,9 +15,12 @@ import {
   statusFinalDe,
   dataProtocoloDe,
   observacoesDe,
+  motivoBloqueioPatch,
   statusIconeClasse,
   type StatusExtra,
 } from '../lib/reportMedicoStatus'
+import { alertaProtocolo, CLASSE_LINHA_ALERTA, LIMITE_DIAS_PROTOCOLADO } from '../lib/alertas'
+import { useReportMedicoStatusRealtime } from '../hooks/useReportMedicoStatusRealtime'
 import type { SolicitacaoImportada } from '../lib/types'
 
 // A tabela tem mais de 10 mil solicitações — buscar/renderizar tudo de uma vez deixava a tela
@@ -38,9 +41,19 @@ const STATUS_OPCOES = [
   },
   { value: 'A vencer', label: 'A vencer', icon: 'schedule', iconClassName: statusIconeClasse('A vencer') },
   { value: 'Vencido', label: 'Vencido', icon: 'event_busy', iconClassName: statusIconeClasse('Vencido') },
+  { value: 'Reprovado', label: 'Reprovado', icon: 'cancel', iconClassName: statusIconeClasse('Reprovado') },
 ]
 
-type Linha = SolicitacaoImportada & { report_medico_status: StatusExtra | null }
+// Situação escondida por padrão: reprovadas só aparecem com o botão "Reprovadas" ligado ou
+// quando o próprio usuário as escolhe no filtro de status.
+const SITUACAO_OCULTA = 'Reprovado'
+
+const SELECT_COM_STATUS =
+  '*, report_medico_status(status_final, data_protocolo, observacoes, atualizado_em)'
+
+type StatusExtraComData = StatusExtra & { atualizado_em: string | null }
+
+type Linha = SolicitacaoImportada & { report_medico_status: StatusExtraComData | null }
 
 // data_cirurgia é um `date` puro ('YYYY-MM-DD'); formatar via new Date(...) sofre
 // deslocamento de fuso (vira o dia anterior em UTC-3). Formatação direta na string evita isso.
@@ -62,6 +75,7 @@ export function HistoricoSolicitacoesPage() {
   const [paginaInput, setPaginaInput] = useState('1')
   const [refreshTick, setRefreshTick] = useState(0)
   const [selecionadaId, setSelecionadaId] = useState<string | null>(null)
+  const [mostrarReprovadas, setMostrarReprovadas] = useState(false)
 
   const isGestor = profile?.role === 'gerente_comercial' || profile?.role === 'admin'
   const { porNome: perfisPorNome } = useProfilesDirectory()
@@ -76,9 +90,13 @@ export function HistoricoSolicitacoesPage() {
   // tempo de render (em vez de um efeito reagindo a [busca, statusFilter]) segue o padrão do
   // próprio React para "resetar estado quando outro estado muda", sem o re-render em cascata de
   // um setState síncrono dentro de efeito.
-  const [filtrosAnteriores, setFiltrosAnteriores] = useState({ busca, statusFilter })
-  if (filtrosAnteriores.busca !== busca || filtrosAnteriores.statusFilter !== statusFilter) {
-    setFiltrosAnteriores({ busca, statusFilter })
+  const [filtrosAnteriores, setFiltrosAnteriores] = useState({ busca, statusFilter, mostrarReprovadas })
+  if (
+    filtrosAnteriores.busca !== busca ||
+    filtrosAnteriores.statusFilter !== statusFilter ||
+    filtrosAnteriores.mostrarReprovadas !== mostrarReprovadas
+  ) {
+    setFiltrosAnteriores({ busca, statusFilter, mostrarReprovadas })
     setPagina(1)
   }
 
@@ -98,10 +116,14 @@ export function HistoricoSolicitacoesPage() {
     // builder do supabase-js não aceita mais `.or()`/`.in()`.
     let query = supabase
       .from('solicitacoes_importadas')
-      .select('*, report_medico_status(status_final, data_protocolo, observacoes)', { count: 'exact' })
+      .select(SELECT_COM_STATUS, { count: 'exact' })
 
     if (busca) query = query.or(`paciente_nome.ilike.%${busca}%,medico_nome.ilike.%${busca}%`)
     if (statusFilter.length > 0) query = query.in('situacao', statusFilter)
+    // Pedir "Reprovado" explicitamente no filtro de status já é dizer que se quer vê-las.
+    if (!mostrarReprovadas && !statusFilter.includes(SITUACAO_OCULTA)) {
+      query = query.neq('situacao', SITUACAO_OCULTA)
+    }
 
     // data_cirurgia se repete (ou é nula) em muitas linhas; sem um desempate único (`id`), a
     // paginação por `.range()` pode pular ou duplicar registros entre páginas.
@@ -123,7 +145,7 @@ export function HistoricoSolicitacoesPage() {
     return () => {
       cancelado = true
     }
-  }, [pagina, busca, statusFilter, refreshTick])
+  }, [pagina, busca, statusFilter, mostrarReprovadas, refreshTick])
 
   function fecharModal() {
     setSelecionadaId(null)
@@ -131,7 +153,26 @@ export function HistoricoSolicitacoesPage() {
     setRefreshTick((t) => t + 1)
   }
 
+  // Uma linha mudou em algum lugar (outra aba, outro usuário): mescla só ela, sem refetch — a
+  // tela do gestor acompanha o representante ao vivo sem piscar nem perder a página atual.
+  useReportMedicoStatusRealtime(({ solicitacaoId, extra, atualizadoEm }) => {
+    setSolicitacoes((prev) =>
+      prev.map((s) =>
+        s.id === solicitacaoId
+          ? { ...s, report_medico_status: extra ? { ...extra, atualizado_em: atualizadoEm } : null }
+          : s,
+      ),
+    )
+  })
+
   async function atualizarExtra(solicitacaoId: string, patch: Partial<StatusExtra>) {
+    const linha = solicitacoes.find((s) => s.id === solicitacaoId)
+    const bloqueio = motivoBloqueioPatch(patch, linha?.report_medico_status)
+    if (bloqueio) {
+      toast.warning(bloqueio)
+      return
+    }
+
     const anterior = solicitacoes
     setSolicitacoes((prev) =>
       prev.map((s) =>
@@ -142,6 +183,7 @@ export function HistoricoSolicitacoesPage() {
                 status_final: statusFinalDe(s.report_medico_status),
                 data_protocolo: dataProtocoloDe(s.report_medico_status),
                 observacoes: observacoesDe(s.report_medico_status),
+                atualizado_em: null,
                 ...s.report_medico_status,
                 ...patch,
               },
@@ -203,6 +245,22 @@ export function HistoricoSolicitacoesPage() {
               searchPlaceholder="Buscar status…"
             />
           </div>
+          <button
+            type="button"
+            onClick={() => setMostrarReprovadas((v) => !v)}
+            aria-pressed={mostrarReprovadas}
+            title="Solicitações reprovadas ficam ocultas por padrão"
+            className={`inline-flex items-center gap-2 rounded-lg text-sm font-semibold h-[46px] px-4 transition-colors shrink-0 ${
+              mostrarReprovadas
+                ? 'bg-secondary-container text-secondary'
+                : 'bg-surface-container-high text-secondary hover:bg-surface-container-highest'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[18px]">
+              {mostrarReprovadas ? 'visibility' : 'visibility_off'}
+            </span>
+            Reprovadas
+          </button>
         </div>
       </div>
 
@@ -256,16 +314,34 @@ export function HistoricoSolicitacoesPage() {
                   </td>
                 </tr>
               ) : (
-                solicitacoes.map((s) => (
-                  <tr key={s.id} className="hover:bg-surface-container-high/40 transition-colors group">
+                solicitacoes.map((s) => {
+                  const alerta = alertaProtocolo(s.report_medico_status, s.report_medico_status?.atualizado_em)
+                  return (
+                  <tr
+                    key={s.id}
+                    title={alerta?.motivo}
+                    className={`transition-colors group ${
+                      alerta ? CLASSE_LINHA_ALERTA : 'hover:bg-surface-container-high/40'
+                    }`}
+                  >
                     <td className="px-4 py-2.5">
-                      <button
-                        type="button"
-                        onClick={() => setSelecionadaId(s.id)}
-                        className="font-semibold text-xs text-secondary group-hover:underline text-left truncate max-w-[180px]"
-                      >
-                        {s.paciente_nome ?? '—'}
-                      </button>
+                      <span className="inline-flex items-center gap-1.5 max-w-[190px]">
+                        {alerta && (
+                          <span
+                            className="material-symbols-outlined text-[16px] text-error shrink-0"
+                            aria-label={alerta.motivo}
+                          >
+                            warning
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setSelecionadaId(s.id)}
+                          className="font-semibold text-xs text-secondary group-hover:underline text-left truncate"
+                        >
+                          {s.paciente_nome ?? '—'}
+                        </button>
+                      </span>
                     </td>
                     <td className="px-4 py-2.5">
                       <StatusBadge status={s.situacao ?? '—'} />
@@ -293,7 +369,15 @@ export function HistoricoSolicitacoesPage() {
                       <StatusFinalEditavel
                         status={statusFinalDe(s.report_medico_status)}
                         onChange={(novoStatus) => atualizarExtra(s.id, { status_final: novoStatus })}
+                        motivoBloqueio={(opcao) =>
+                          motivoBloqueioPatch({ status_final: opcao }, s.report_medico_status)
+                        }
                       />
+                      {alerta && (
+                        <span className="block mt-1 text-[10px] font-semibold text-error leading-tight max-w-[190px]">
+                          {alerta.dias} dias em protocolo (limite {LIMITE_DIAS_PROTOCOLADO})
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-2.5 whitespace-nowrap">
                       <ProtocoloDateInput
@@ -309,7 +393,8 @@ export function HistoricoSolicitacoesPage() {
                       />
                     </td>
                   </tr>
-                ))
+                  )
+                })
               )}
             </tbody>
           </table>

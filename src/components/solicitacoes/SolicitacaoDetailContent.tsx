@@ -2,7 +2,8 @@ import { Card } from '../ui/Card'
 import { StatusFinalEditavel } from '../relatorios/StatusFinalEditavel'
 import { ProtocoloDateInput, ObservacaoTextarea } from '../relatorios/CamposAcompanhamentoEditaveis'
 import { SolicitacaoTimeline } from './SolicitacaoTimeline'
-import { statusFinalDe, type StatusExtra } from '../../lib/reportMedicoStatus'
+import { motivoBloqueioPatch, statusFinalDe, type StatusExtra } from '../../lib/reportMedicoStatus'
+import { alertaProtocolo } from '../../lib/alertas'
 import type { SolicitacaoImportada } from '../../lib/types'
 
 const currencyFull = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -35,7 +36,7 @@ export function SolicitacaoDetailContent({
   onAtualizarExtra,
 }: {
   solicitacao: SolicitacaoImportada
-  statusExtra: StatusExtra | null
+  statusExtra: (StatusExtra & { atualizado_em?: string | null }) | null
   onAtualizarExtra: (patch: Partial<StatusExtra>) => void | Promise<void>
 }) {
   const dataCirurgiaCompleta = solicitacao.data_cirurgia
@@ -45,9 +46,24 @@ export function SolicitacaoDetailContent({
     : 'A definir'
 
   const statusFinal = statusFinalDe(statusExtra)
+  const alerta = alertaProtocolo(statusExtra, statusExtra?.atualizado_em)
 
   return (
     <div className="flex flex-col gap-6">
+      {alerta && (
+        <div
+          className="flex items-start gap-3 rounded-xl bg-error-container/60 border-l-[3px] border-l-error px-5 py-4"
+          role="alert"
+        >
+          <span className="material-symbols-outlined text-error text-[22px] shrink-0">warning</span>
+          <div>
+            <p className="font-headline font-bold text-sm text-on-error-container">
+              Solicitação parada há {alerta.dias} dias
+            </p>
+            <p className="text-xs text-on-error-container/90 mt-0.5">{alerta.motivo}</p>
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card className="p-6 flex flex-col gap-5">
           <div className="flex items-center gap-3">
@@ -137,11 +153,17 @@ export function SolicitacaoDetailContent({
               <StatusFinalEditavel
                 status={statusFinal}
                 onChange={(novoStatus) => onAtualizarExtra({ status_final: novoStatus })}
+                motivoBloqueio={(opcao) => motivoBloqueioPatch({ status_final: opcao }, statusExtra)}
               />
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-bold text-outline uppercase tracking-wide">Data Protocolo</label>
+            <label className="text-[10px] font-bold text-outline uppercase tracking-wide">
+              Data Protocolo
+              <span className="ml-1 normal-case tracking-normal font-medium text-outline/80">
+                (obrigatória para "PROTOCOLADO")
+              </span>
+            </label>
             <ProtocoloDateInput
               valor={statusExtra?.data_protocolo ?? null}
               onCommit={(v) => onAtualizarExtra({ data_protocolo: v || null })}

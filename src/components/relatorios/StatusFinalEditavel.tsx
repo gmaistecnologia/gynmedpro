@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { toast } from 'sonner'
 import {
   STATUS_FINAL_OPCOES,
   statusBadgeClasse,
@@ -17,9 +18,16 @@ type Posicao = { left: number; width: number; maxHeight: number; top?: number; b
 export function StatusFinalEditavel({
   status,
   onChange,
+  motivoBloqueio,
 }: {
   status: string
   onChange: (novoStatus: string) => void | Promise<void>
+  /**
+   * Devolve o motivo pelo qual a opção não pode ser escolhida agora, ou `null` se ela está
+   * liberada. Usado hoje para exigir a Data Protocolo antes de "PROTOCOLADO" — a opção fica
+   * esmaecida com cadeado e o motivo aparece ao clicar, em vez de o erro só estourar no banco.
+   */
+  motivoBloqueio?: (opcao: string) => string | null
 }) {
   const [open, setOpen] = useState(false)
   const [salvando, setSalvando] = useState(false)
@@ -86,6 +94,11 @@ export function StatusFinalEditavel({
   }
 
   async function selecionar(novoStatus: string) {
+    const bloqueio = motivoBloqueio?.(novoStatus)
+    if (bloqueio) {
+      toast.warning(bloqueio)
+      return
+    }
     setOpen(false)
     if (novoStatus === status) return
     setSalvando(true)
@@ -129,20 +142,32 @@ export function StatusFinalEditavel({
           >
             {STATUS_FINAL_OPCOES.map((opcao) => {
               const selecionado = opcao === status
+              const bloqueio = motivoBloqueio?.(opcao) ?? null
               return (
                 <button
                   key={opcao}
                   type="button"
                   onClick={() => selecionar(opcao)}
+                  title={bloqueio ?? undefined}
+                  aria-disabled={bloqueio ? true : undefined}
                   className={`w-full flex items-center gap-2 text-left px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
-                    selecionado ? `font-bold text-on-surface ${statusSelecionadoClasse(opcao)}` : 'font-medium text-on-surface hover:bg-surface-container-high/60'
+                    bloqueio
+                      ? 'font-medium text-outline cursor-not-allowed hover:bg-surface-container-high/30'
+                      : selecionado
+                        ? `font-bold text-on-surface ${statusSelecionadoClasse(opcao)}`
+                        : 'font-medium text-on-surface hover:bg-surface-container-high/60'
                   }`}
                 >
-                  <span className={`material-symbols-outlined text-[15px] shrink-0 ${statusIconeClasse(opcao)}`}>
+                  <span
+                    className={`material-symbols-outlined text-[15px] shrink-0 ${bloqueio ? 'text-outline' : statusIconeClasse(opcao)}`}
+                  >
                     {statusFinalIcone(opcao)}
                   </span>
                   <span className="flex-1 truncate">{opcao}</span>
-                  {selecionado && <span className="material-symbols-outlined text-[15px] text-primary shrink-0">check</span>}
+                  {bloqueio && <span className="material-symbols-outlined text-[14px] text-outline shrink-0">lock</span>}
+                  {!bloqueio && selecionado && (
+                    <span className="material-symbols-outlined text-[15px] text-primary shrink-0">check</span>
+                  )}
                 </button>
               )
             })}

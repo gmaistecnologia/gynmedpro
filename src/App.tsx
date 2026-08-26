@@ -11,6 +11,7 @@ import { AprovacoesPage } from './pages/AprovacoesPage'
 import { RelatoriosPage } from './pages/RelatoriosPage'
 import { ReportMedicoPage } from './pages/ReportMedicoPage'
 import { ImportarPlanilhaPage } from './pages/ImportarPlanilhaPage'
+import { AtividadesPage } from './pages/AtividadesPage'
 import { ConfiguracoesPage } from './pages/ConfiguracoesPage'
 import { PerfilPage } from './pages/PerfilPage'
 
@@ -42,6 +43,7 @@ export default function App() {
 
               <Route element={<RequireRole roles={['admin']} />}>
                 <Route path="/importar" element={<ImportarPlanilhaPage />} />
+                <Route path="/atividades" element={<AtividadesPage />} />
                 <Route path="/configuracoes" element={<ConfiguracoesPage />} />
               </Route>
             </Route>

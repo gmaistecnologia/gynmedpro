@@ -42,6 +42,7 @@ export const GESTOR_ITEMS: NavItem[] = [
 
 export const ADMIN_ITEMS: LinkNavItem[] = [
   { kind: 'link', to: '/importar', label: 'Importar Planilha', icon: 'upload_file' },
+  { kind: 'link', to: '/atividades', label: 'Atividades', icon: 'manage_search' },
   { kind: 'link', to: '/configuracoes', label: 'Configurações', icon: 'settings' },
 ]
 

@@ -3,14 +3,14 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { Card } from '../components/ui/Card'
-import { statusBadgeClasse, statusFinalIcone } from '../lib/reportMedicoStatus'
+import { normalizarStatusFinal, statusBadgeClasse, statusFinalIcone } from '../lib/reportMedicoStatus'
 import { MESES, componentesIso, deslocarMes, formatarDataBR, hojeIso, paraIso } from '../lib/dateUtils'
 import type { SolicitacaoImportada } from '../lib/types'
 
 // Mesmo agrupamento usado no Report Médico (src/pages/ReportMedicoPage.tsx), para que os
 // totais deste painel batam com o que o representante vê lá.
 const STATUS_EM_ABERTO = ['SOLICITADO', 'PROTOCOLADO']
-const STATUS_APROVADAS = ['AUTORIZADO', 'AGENDAMENTO', 'PENDÊNCIA AGENDAMENTO', 'CIRURGIA REALIZADA']
+const STATUS_APROVADAS = ['AUTORIZADO', 'AGENDADO', 'PENDÊNCIA AGENDAMENTO', 'CIRURGIA REALIZADA']
 const STATUS_RECUSADAS = ['NEGADO', 'CANCELADO', 'DESISTÊNCIA']
 
 type Linha = Pick<
@@ -63,7 +63,7 @@ function limitesPeriodo(periodo: PeriodoKey): { de: string; ate: string; rotulo:
 }
 
 function statusFinalDe(r: Linha): string {
-  return r.report_medico_status?.status_final ?? 'SOLICITADO'
+  return normalizarStatusFinal(r.report_medico_status?.status_final) || 'SOLICITADO'
 }
 
 export function RepresentanteDashboardPage() {

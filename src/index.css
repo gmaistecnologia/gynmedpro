@@ -113,11 +113,18 @@
   its own `overflow-x-auto` container instead. This rule is the safety net,
   not the fix: if a page scrolls sideways, something inside it is missing
   `min-w-0` or its own scroll container, not this line.
+
+  `clip`, não `hidden`: com `overflow-x: hidden` o `overflow-y: visible` do
+  eixo oposto computa para `auto`, e o #root vira um contêiner de rolagem —
+  que, sem altura limitada, nunca rola. Isso quebrava todo `position: sticky`
+  ancorado na janela (ex.: o cabeçalho da tabela do Report Médico), porque o
+  sticky passava a se referir ao #root em vez do viewport. `clip` corta igual
+  na horizontal sem criar scrollport nenhum.
 */
 html,
 body,
 #root {
-  overflow-x: hidden;
+  overflow-x: clip;
   max-width: 100vw;
 }
 

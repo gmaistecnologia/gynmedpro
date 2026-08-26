@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { Card } from '../components/ui/Card'
@@ -8,21 +8,39 @@ import { DateRangeField } from '../components/ui/DateRangeField'
 import { SolicitacaoDetailModal } from '../components/solicitacoes/SolicitacaoDetailModal'
 import {
   STATUS_FINAL_OPCOES,
+  normalizarStatusFinal,
   statusBadgeClasse,
   statusBordaClasse,
   statusIconeClasse,
   statusFinalIcone,
 } from '../lib/reportMedicoStatus'
+import { alertaProtocolo, CLASSE_LINHA_ALERTA, LIMITE_DIAS_PROTOCOLADO, type Alerta } from '../lib/alertas'
+import { useReportMedicoStatusRealtime } from '../hooks/useReportMedicoStatusRealtime'
 import { componentesIso, deslocarMes, hojeIso, paraIso } from '../lib/dateUtils'
 import type { SolicitacaoImportada } from '../lib/types'
 
+const SELECT_COM_STATUS =
+  '*, report_medico_status(status_final, data_protocolo, observacoes, atualizado_em)'
+
+// Situação (vinda da planilha) que fica escondida por padrão: reprovadas poluem a operação do
+// dia a dia, mas continuam a um clique de distância pelo botão "Reprovadas".
+const SITUACAO_OCULTA = 'Reprovado'
+
 const TAMANHO_PAGINA = 50
 
+// Altura da TopNavBar fixa (h-16). É a partir dela que o cabeçalho da tabela gruda.
+const ALTURA_TOPNAV = 64
+
 const STATUS_EM_ABERTO = ['SOLICITADO', 'PROTOCOLADO']
-const STATUS_AUTORIZADAS = ['AUTORIZADO', 'AGENDAMENTO', 'PENDÊNCIA AGENDAMENTO']
+const STATUS_AUTORIZADAS = ['AUTORIZADO', 'AGENDADO', 'PENDÊNCIA AGENDAMENTO']
 const STATUS_NEGATIVAS = ['NEGADO', 'CANCELADO', 'DESISTÊNCIA']
 
-type StatusExtra = { status_final: string; data_protocolo: string | null; observacoes: string | null }
+type StatusExtra = {
+  status_final: string
+  data_protocolo: string | null
+  observacoes: string | null
+  atualizado_em: string | null
+}
 
 type Linha = SolicitacaoImportada & { report_medico_status: StatusExtra | null }
 
@@ -43,6 +61,8 @@ type Filtros = {
   dataAutorizacaoDe: string
   dataAutorizacaoAte: string
   observacoes: string
+  somenteAlertas: boolean
+  mostrarReprovadas: boolean
 }
 
 // Padrão da tela: "Data Solicitação" já vem preenchida com o mês atual + 4 meses anteriores
@@ -70,11 +90,16 @@ function filtrosVazios(): Filtros {
     dataAutorizacaoDe: '',
     dataAutorizacaoAte: '',
     observacoes: '',
+    somenteAlertas: false,
+    mostrarReprovadas: false,
   }
 }
 
 function statusFinalDe(r: Linha): string {
-  return r.report_medico_status?.status_final ?? 'SOLICITADO'
+  return normalizarStatusFinal(r.report_medico_status?.status_final) || 'SOLICITADO'
+}
+function alertaDe(r: Linha): Alerta | null {
+  return alertaProtocolo(r.report_medico_status, r.report_medico_status?.atualizado_em)
 }
 function dataProtocoloDe(r: Linha): string | null {
   return r.report_medico_status?.data_protocolo ?? null
@@ -96,7 +121,7 @@ async function fetchTodasComStatus(): Promise<Linha[]> {
   for (;;) {
     const { data, error } = await supabase
       .from('solicitacoes_importadas')
-      .select('*, report_medico_status(status_final, data_protocolo, observacoes)')
+      .select(SELECT_COM_STATUS)
       .order('data_solicitacao', { ascending: false })
       .range(offset, offset + tamanhoLote - 1)
     if (error) throw error
@@ -138,6 +163,20 @@ export function ReportMedicoPage() {
   const [pagina, setPagina] = useState(1)
   const [selecionadaId, setSelecionadaId] = useState<string | null>(null)
 
+  // O cabeçalho da Card (título + contador) e a linha de títulos da tabela grudam juntos no topo
+  // da janela. Como os dois são sticky, o segundo precisa saber a altura exata do primeiro —
+  // medida em tempo real, porque o bloco cresce quando o texto quebra em telas mais estreitas.
+  const cabecalhoRef = useRef<HTMLDivElement>(null)
+  const [alturaCabecalho, setAlturaCabecalho] = useState(0)
+
+  useEffect(() => {
+    const elemento = cabecalhoRef.current
+    if (!elemento) return
+    const observador = new ResizeObserver(() => setAlturaCabecalho(elemento.offsetHeight))
+    observador.observe(elemento)
+    return () => observador.disconnect()
+  }, [loading])
+
   useEffect(() => {
     fetchTodasComStatus()
       .then(setLinhas)
@@ -145,10 +184,27 @@ export function ReportMedicoPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  function fecharModal() {
+  // Mescla no lugar a linha que mudou, sem refazer a consulta inteira: a tela do gestor reflete
+  // a edição de qualquer representante sem piscar, sem perder filtro/página e sem refresh.
+  const mesclarStatus = useCallback((solicitacaoId: string, extra: StatusExtra | null) => {
+    setLinhas((prev) =>
+      prev.map((l) => (l.id === solicitacaoId ? { ...l, report_medico_status: extra } : l)),
+    )
+  }, [])
+
+  useReportMedicoStatusRealtime(({ solicitacaoId, extra, atualizadoEm }) => {
+    mesclarStatus(solicitacaoId, extra ? { ...extra, atualizado_em: atualizadoEm } : null)
+  })
+
+  async function fecharModal() {
+    const id = selecionadaId
     setSelecionadaId(null)
-    // Reflete no read-only qualquer alteração feita no modal (Status Final, Protocolo, Observações).
-    fetchTodasComStatus().then(setLinhas)
+    if (!id) return
+    // Rede de segurança para o caso de o realtime não estar ativo no projeto: relê só a linha
+    // editada (uma consulta de um registro), em vez de recarregar a tabela toda.
+    const { data } = await supabase.from('solicitacoes_importadas').select(SELECT_COM_STATUS).eq('id', id).single()
+    const linha = data as unknown as Linha | null
+    if (linha) mesclarStatus(id, linha.report_medico_status)
   }
 
   useEffect(() => {
@@ -202,6 +258,8 @@ export function ReportMedicoPage() {
 
   const filtradas = useMemo(() => {
     return linhas.filter((r) => {
+      if (!filtros.mostrarReprovadas && r.situacao === SITUACAO_OCULTA) return false
+      if (filtros.somenteAlertas && !alertaDe(r)) return false
       if (filtros.representantes.length && !filtros.representantes.includes(r.representante_nome ?? '')) return false
       if (filtros.procedimentos.length && !filtros.procedimentos.includes(r.descricao_tipo ?? '')) return false
       if (filtros.convenios.length && !filtros.convenios.includes(r.plano_saude_nome ?? '')) return false
@@ -255,9 +313,13 @@ export function ReportMedicoPage() {
     const autorizadas = filtradas.filter((r) => STATUS_AUTORIZADAS.includes(statusFinalDe(r))).length
     const cirurgias = filtradas.filter((r) => statusFinalDe(r) === 'CIRURGIA REALIZADA').length
     const negativas = filtradas.filter((r) => STATUS_NEGATIVAS.includes(statusFinalDe(r))).length
+    const alertas = filtradas.filter((r) => alertaDe(r)).length
     const pctCirurgias = filtradas.length > 0 ? Math.round((cirurgias / filtradas.length) * 100) : 0
-    return { emAberto, autorizadas, cirurgias, negativas, pctCirurgias }
+    return { emAberto, autorizadas, cirurgias, negativas, alertas, pctCirurgias }
   }, [filtradas])
+
+  // Compartilhado pelas 9 colunas: `top` do sticky = barra fixa do topo + cabeçalho da Card.
+  const estiloTituloFixo = { top: ALTURA_TOPNAV + alturaCabecalho }
 
   function alternarOrdenacao(key: SortKey) {
     if (key === sortKey) {
@@ -386,6 +448,38 @@ export function ReportMedicoPage() {
 
           <button
             type="button"
+            onClick={() => atualizarFiltro('somenteAlertas', !filtros.somenteAlertas)}
+            aria-pressed={filtros.somenteAlertas}
+            title={`Solicitações há ${LIMITE_DIAS_PROTOCOLADO} dias ou mais em PROTOCOLADO`}
+            className={`inline-flex items-center gap-2 rounded-lg text-sm font-semibold py-2.5 px-4 h-[46px] transition-colors shrink-0 ${
+              filtros.somenteAlertas
+                ? 'bg-error text-on-error'
+                : 'bg-surface-container-high text-secondary hover:bg-surface-container-highest'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[18px]">warning</span>
+            Só alertas
+          </button>
+
+          <button
+            type="button"
+            onClick={() => atualizarFiltro('mostrarReprovadas', !filtros.mostrarReprovadas)}
+            aria-pressed={filtros.mostrarReprovadas}
+            title="Solicitações com situação Reprovado ficam ocultas por padrão"
+            className={`inline-flex items-center gap-2 rounded-lg text-sm font-semibold py-2.5 px-4 h-[46px] transition-colors shrink-0 ${
+              filtros.mostrarReprovadas
+                ? 'bg-secondary-container text-secondary'
+                : 'bg-surface-container-high text-secondary hover:bg-surface-container-highest'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[18px]">
+              {filtros.mostrarReprovadas ? 'visibility' : 'visibility_off'}
+            </span>
+            Reprovadas
+          </button>
+
+          <button
+            type="button"
             onClick={limparFiltros}
             className="bg-surface-container-high text-secondary hover:bg-surface-container-highest rounded-lg text-sm font-semibold py-2.5 px-5 h-[46px] transition-colors shrink-0"
           >
@@ -394,7 +488,7 @@ export function ReportMedicoPage() {
         </div>
       </Card>
 
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
         <StatTile
           label="Em Aberto"
           value={String(stats.emAberto)}
@@ -419,10 +513,23 @@ export function ReportMedicoPage() {
           sublabel="Negado + cancelado + desist."
           dotClass="bg-error"
         />
+        <StatTile
+          label="Alertas"
+          value={String(stats.alertas)}
+          sublabel={`+${LIMITE_DIAS_PROTOCOLADO} dias protocolado`}
+          dotClass="bg-error"
+        />
       </section>
 
-      <Card className="overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-outline-variant/10">
+      {/* `overflow-visible` a partir de lg: um contêiner com overflow no eixo X passa a ser o
+          scrollport dos filhos sticky, e aí o cabeçalho grudaria nele (que não rola) em vez da
+          janela. Abaixo de lg a tabela não cabe na largura, então lá vale mais a rolagem
+          horizontal do que o cabeçalho fixo. */}
+      <Card className="overflow-hidden lg:overflow-visible">
+        <div
+          ref={cabecalhoRef}
+          className="flex items-center justify-between px-6 py-5 border-b border-outline-variant/10 bg-surface-container-lowest rounded-t-xl lg:sticky lg:top-16 lg:z-30"
+        >
           <div>
             <h2 className="font-headline font-bold text-lg text-secondary">Registros · Report Médico</h2>
             <p className="text-xs text-on-surface-variant mt-0.5">
@@ -434,27 +541,34 @@ export function ReportMedicoPage() {
           </span>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto lg:overflow-x-visible">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-surface-container-low">
-                <th className="px-6 py-3 font-headline font-bold text-[11px] text-on-surface-variant uppercase tracking-widest">
+              <tr>
+                <th
+                  style={estiloTituloFixo}
+                  className="lg:sticky z-20 bg-surface-container-low px-6 py-3 font-headline font-bold text-[11px] text-on-surface-variant uppercase tracking-widest">
                   Paciente
                 </th>
-                <th className="px-4 py-3 font-headline font-bold text-[11px] text-on-surface-variant uppercase tracking-widest">
+                <th
+                  style={estiloTituloFixo}
+                  className="lg:sticky z-20 bg-surface-container-low px-4 py-3 font-headline font-bold text-[11px] text-on-surface-variant uppercase tracking-widest">
                   Procedimento
                 </th>
-                <th className="px-4 py-3 font-headline font-bold text-[11px] text-on-surface-variant uppercase tracking-widest">
+                <th
+                  style={estiloTituloFixo}
+                  className="lg:sticky z-20 bg-surface-container-low px-4 py-3 font-headline font-bold text-[11px] text-on-surface-variant uppercase tracking-widest">
                   Convênio
                 </th>
-                <th className="px-4 py-3 font-headline font-bold text-[11px] text-on-surface-variant uppercase tracking-widest">
+                <th
+                  style={estiloTituloFixo}
+                  className="lg:sticky z-20 bg-surface-container-low px-4 py-3 font-headline font-bold text-[11px] text-on-surface-variant uppercase tracking-widest">
                   Hospital
                 </th>
                 <th
-                  className={`px-4 py-3 font-headline font-bold text-[11px] uppercase tracking-widest cursor-pointer select-none whitespace-nowrap transition-colors ${
-                    sortKey === 'data_solicitacao'
-                      ? 'text-primary-container bg-primary-container/10'
-                      : 'text-on-surface-variant hover:text-primary'
+                  style={estiloTituloFixo}
+                  className={`lg:sticky z-20 bg-surface-container-low px-4 py-3 font-headline font-bold text-[11px] uppercase tracking-widest cursor-pointer select-none whitespace-nowrap transition-colors ${
+                    sortKey === 'data_solicitacao' ? 'text-primary-container' : 'text-on-surface-variant hover:text-primary'
                   }`}
                   onClick={() => alternarOrdenacao('data_solicitacao')}
                 >
@@ -468,10 +582,9 @@ export function ReportMedicoPage() {
                   </span>
                 </th>
                 <th
-                  className={`px-4 py-3 font-headline font-bold text-[11px] uppercase tracking-widest cursor-pointer select-none whitespace-nowrap transition-colors ${
-                    sortKey === 'data_protocolo'
-                      ? 'text-primary-container bg-primary-container/10'
-                      : 'text-on-surface-variant hover:text-primary'
+                  style={estiloTituloFixo}
+                  className={`lg:sticky z-20 bg-surface-container-low px-4 py-3 font-headline font-bold text-[11px] uppercase tracking-widest cursor-pointer select-none whitespace-nowrap transition-colors ${
+                    sortKey === 'data_protocolo' ? 'text-primary-container' : 'text-on-surface-variant hover:text-primary'
                   }`}
                   onClick={() => alternarOrdenacao('data_protocolo')}
                 >
@@ -485,10 +598,9 @@ export function ReportMedicoPage() {
                   </span>
                 </th>
                 <th
-                  className={`px-4 py-3 font-headline font-bold text-[11px] uppercase tracking-widest cursor-pointer select-none whitespace-nowrap transition-colors ${
-                    sortKey === 'data_cirurgia'
-                      ? 'text-primary-container bg-primary-container/10'
-                      : 'text-on-surface-variant hover:text-primary'
+                  style={estiloTituloFixo}
+                  className={`lg:sticky z-20 bg-surface-container-low px-4 py-3 font-headline font-bold text-[11px] uppercase tracking-widest cursor-pointer select-none whitespace-nowrap transition-colors ${
+                    sortKey === 'data_cirurgia' ? 'text-primary-container' : 'text-on-surface-variant hover:text-primary'
                   }`}
                   onClick={() => alternarOrdenacao('data_cirurgia')}
                 >
@@ -501,10 +613,14 @@ export function ReportMedicoPage() {
                     )}
                   </span>
                 </th>
-                <th className="px-4 py-3 font-headline font-bold text-[11px] text-on-surface-variant uppercase tracking-widest">
+                <th
+                  style={estiloTituloFixo}
+                  className="lg:sticky z-20 bg-surface-container-low px-4 py-3 font-headline font-bold text-[11px] text-on-surface-variant uppercase tracking-widest">
                   Status Final
                 </th>
-                <th className="px-4 py-3 font-headline font-bold text-[11px] text-on-surface-variant uppercase tracking-widest">
+                <th
+                  style={estiloTituloFixo}
+                  className="lg:sticky z-20 bg-surface-container-low px-4 py-3 font-headline font-bold text-[11px] text-on-surface-variant uppercase tracking-widest">
                   Observações
                 </th>
               </tr>
@@ -519,14 +635,31 @@ export function ReportMedicoPage() {
                   </td>
                 </tr>
               ) : (
-                visiveis.map((r) => (
+                visiveis.map((r) => {
+                  const alerta = alertaDe(r)
+                  return (
                   <tr
                     key={r.id}
                     onClick={() => setSelecionadaId(r.id)}
-                    className={`cursor-pointer hover:bg-surface-container-high/40 transition-colors ${statusBordaClasse(statusFinalDe(r))}`}
+                    title={alerta?.motivo}
+                    className={`cursor-pointer transition-colors ${
+                      alerta
+                        ? CLASSE_LINHA_ALERTA
+                        : `hover:bg-surface-container-high/40 ${statusBordaClasse(statusFinalDe(r))}`
+                    }`}
                   >
                     <td className="px-6 py-3 text-sm font-bold text-secondary uppercase truncate max-w-[220px] hover:underline">
-                      {r.paciente_nome ?? '—'}
+                      <span className="inline-flex items-center gap-1.5">
+                        {alerta && (
+                          <span
+                            className="material-symbols-outlined text-[16px] text-error shrink-0"
+                            aria-label={alerta.motivo}
+                          >
+                            warning
+                          </span>
+                        )}
+                        {r.paciente_nome ?? '—'}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-on-surface truncate max-w-[180px]">
                       {r.descricao_tipo ?? '—'}
@@ -546,24 +679,39 @@ export function ReportMedicoPage() {
                     <td className="px-4 py-3 text-sm text-on-surface whitespace-nowrap">
                       {formatDataBR(r.data_solicitacao)}
                     </td>
-                    <td className="px-4 py-3 text-sm text-on-surface-variant whitespace-nowrap">
-                      {formatDataBR(dataProtocoloDe(r))}
+                    <td className="px-4 py-3 text-sm whitespace-nowrap">
+                      <span className={alerta ? 'font-bold text-error' : 'text-on-surface-variant'}>
+                        {formatDataBR(dataProtocoloDe(r))}
+                      </span>
+                      {alerta && (
+                        <span className="block text-[10px] font-semibold text-error uppercase tracking-wide">
+                          {alerta.dias} dias parado
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm text-on-surface-variant whitespace-nowrap">
                       {formatDataBR(r.data_cirurgia)}
                     </td>
                     <td className="px-4 py-3">
                       <span
-                        className={`inline-flex items-center px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full border ${statusBadgeClasse(statusFinalDe(r))}`}
+                        className={`inline-flex items-center px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full border ${
+                          alerta ? 'bg-error text-on-error border-error' : statusBadgeClasse(statusFinalDe(r))
+                        }`}
                       >
                         {statusFinalDe(r)}
                       </span>
+                      {alerta && (
+                        <span className="block mt-1 text-[10px] font-semibold text-error leading-tight max-w-[200px]">
+                          {alerta.motivo}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm text-on-surface-variant truncate max-w-[220px]">
                       {observacoesDe(r) || '—'}
                     </td>
                   </tr>
-                ))
+                  )
+                })
               )}
             </tbody>
           </table>

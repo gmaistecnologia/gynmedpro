@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import type { Session } from '@supabase/supabase-js'
 import { toast } from 'sonner'
 import { supabase } from './supabase'
+import { registrarLogin } from './atividades'
 import type { ProfileCompleto } from './types'
 
 type AuthContextValue = {
@@ -45,17 +46,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session)
       userIdRef.current = session?.user.id ?? null
       if (session) {
+        // Carimba o último acesso e grava a linha de auditoria (ver Registro de Atividades). A
+        // função no banco ignora chamadas repetidas em menos de 5 min, então reabrir uma aba
+        // não vira um "login" novo.
+        registrarLogin()
         loadProfile(session.user.id).finally(() => active && setLoading(false))
       } else {
         setLoading(false)
       }
     })
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: subscription } = supabase.auth.onAuthStateChange((evento, session) => {
       if (!active) return
       setSession(session)
       userIdRef.current = session?.user.id ?? null
       if (session) {
+        // Só em SIGNED_IN: TOKEN_REFRESHED dispara de hora em hora e não é um acesso novo.
+        if (evento === 'SIGNED_IN') registrarLogin()
         loadProfile(session.user.id)
       } else {
         setProfile(null)

@@ -46,6 +46,60 @@ export type Database = {
           },
         ]
       }
+      atividades_log: {
+        Row: {
+          criado_em: string
+          id: string
+          paciente_nome: string | null
+          solicitacao_id: string | null
+          tipo: string
+          usuario_id: string | null
+          usuario_nome: string | null
+          usuario_role: string | null
+          valor_anterior: string | null
+          valor_novo: string | null
+        }
+        Insert: {
+          criado_em?: string
+          id?: string
+          paciente_nome?: string | null
+          solicitacao_id?: string | null
+          tipo: string
+          usuario_id?: string | null
+          usuario_nome?: string | null
+          usuario_role?: string | null
+          valor_anterior?: string | null
+          valor_novo?: string | null
+        }
+        Update: {
+          criado_em?: string
+          id?: string
+          paciente_nome?: string | null
+          solicitacao_id?: string | null
+          tipo?: string
+          usuario_id?: string | null
+          usuario_nome?: string | null
+          usuario_role?: string | null
+          valor_anterior?: string | null
+          valor_novo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atividades_log_solicitacao_id_fkey"
+            columns: ["solicitacao_id"]
+            isOneToOne: false
+            referencedRelation: "solicitacoes_importadas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atividades_log_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hospitais: {
         Row: {
           cidade: string | null
@@ -215,6 +269,7 @@ export type Database = {
           id: string
           nome: string
           role: string
+          ultimo_login: string | null
         }
         Insert: {
           ativo?: boolean
@@ -225,6 +280,7 @@ export type Database = {
           id: string
           nome: string
           role?: string
+          ultimo_login?: string | null
         }
         Update: {
           ativo?: boolean
@@ -235,6 +291,7 @@ export type Database = {
           id?: string
           nome?: string
           role?: string
+          ultimo_login?: string | null
         }
         Relationships: []
       }
@@ -474,6 +531,7 @@ export type Database = {
     Functions: {
       get_my_role: { Args: never; Returns: string }
       is_admin: { Args: never; Returns: boolean }
+      registrar_login: { Args: never; Returns: undefined }
       upsert_solicitacoes_importadas: { Args: { linhas: Json }; Returns: Json }
     }
     Enums: {

@@ -5,6 +5,7 @@ import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
 import { Avatar } from '../ui/Avatar'
 import { UsuarioInativoBadge } from '../ui/UsuarioInativoBadge'
+import { formatarDataHoraBR, tempoRelativo } from '../../lib/atividades'
 import type { ProfileCompleto, Role } from '../../lib/types'
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -336,6 +337,9 @@ export function UsuariosSection() {
                   Comissão
                 </th>
                 <th className="px-6 py-4 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-widest">
+                  Último acesso
+                </th>
+                <th className="px-6 py-4 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-widest">
                   Status
                 </th>
                 <th className="px-6 py-4 font-headline font-bold text-xs text-on-surface-variant uppercase tracking-widest text-right">
@@ -346,13 +350,13 @@ export function UsuariosSection() {
             <tbody className="divide-y divide-surface-container-high">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-sm text-on-surface-variant">
+                  <td colSpan={6} className="px-6 py-8 text-center text-sm text-on-surface-variant">
                     Carregando…
                   </td>
                 </tr>
               ) : usuariosFiltrados.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-sm text-on-surface-variant">
+                  <td colSpan={6} className="px-6 py-8 text-center text-sm text-on-surface-variant">
                     Nenhum usuário encontrado.
                   </td>
                 </tr>
@@ -413,6 +417,20 @@ export function UsuariosSection() {
                           `${usuario.comissao_padrao}%`
                         ) : (
                           '—'
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {usuario.ultimo_login ? (
+                          <span className="flex flex-col leading-tight">
+                            <span className="text-sm text-on-surface-variant">
+                              {tempoRelativo(usuario.ultimo_login)}
+                            </span>
+                            <span className="text-[10px] text-outline">
+                              {formatarDataHoraBR(usuario.ultimo_login)}
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-sm text-outline">nunca acessou</span>
                         )}
                       </td>
                       <td className="px-6 py-4">
@@ -482,7 +500,7 @@ export function UsuariosSection() {
                     </tr>
                     {editandoCredenciais && (
                       <tr className="bg-surface-container-low/60">
-                        <td colSpan={5} className="px-6 py-5">
+                        <td colSpan={6} className="px-6 py-5">
                           <div className="flex flex-col gap-4">
                             <p className="text-xs text-on-surface-variant">
                               Preencha só o que quiser trocar — e-mail e senha são independentes. Digite cada valor duas
