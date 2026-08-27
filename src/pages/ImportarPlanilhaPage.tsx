@@ -31,6 +31,7 @@ export function ImportarPlanilhaPage() {
   const [mapeamento, setMapeamento] = useState<MapeamentoColunas>({})
   const [progresso, setProgresso] = useState({ processados: 0, total: 0 })
   const [resultado, setResultado] = useState<{ importados: number; ignorados: number; erros: string[] } | null>(null)
+  const [reconciliando, setReconciliando] = useState(false)
 
   const registrosConstruidos = useMemo(() => {
     if (!planilha) return []
@@ -119,6 +120,29 @@ export function ImportarPlanilhaPage() {
     }
   }
 
+  // O vínculo entre uma solicitação e o login do representante (`representante_id`) só é
+  // calculado no momento da importação, comparando nome a nome — e nunca se recalcula sozinho
+  // depois. Se o representante ainda não tinha login na hora daquela importação, ou renomeou a
+  // si mesmo em Perfil depois, o vínculo fica quebrado e o painel dele aparece zerado mesmo com
+  // solicitações no banco (foi exatamente o que aconteceu em 2026-08-27). Este botão roda a
+  // mesma reconciliação sob demanda, sem precisar de SQL manual.
+  async function reconciliarVinculos() {
+    setReconciliando(true)
+    const { data, error } = await supabase.rpc('reconciliar_representante_id')
+    setReconciliando(false)
+
+    if (error) {
+      toast.error('Não foi possível reconciliar os vínculos.', { description: error.message })
+      return
+    }
+    const corrigidas = (data as number | null) ?? 0
+    if (corrigidas === 0) {
+      toast.success('Tudo certo — nenhum vínculo pendente encontrado.')
+    } else {
+      toast.success(`${corrigidas} solicitação(ões) vinculada(s) ao representante correto.`)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <header>
@@ -128,6 +152,24 @@ export function ImportarPlanilhaPage() {
           Nro. Agendamento quando não há orçamento) são sobrescritas; linhas novas são adicionadas.
         </p>
       </header>
+
+      <Card className="p-5 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-start gap-3 min-w-0">
+          <span className="material-symbols-outlined text-primary mt-0.5 shrink-0">link</span>
+          <div>
+            <p className="text-sm font-semibold text-on-surface">Vínculo de representantes</p>
+            <p className="text-xs text-on-surface-variant mt-0.5">
+              Se um representante logar e não ver as próprias solicitações, é provável que o vínculo com o
+              login dele não foi calculado na importação. Rode a reconciliação abaixo pra corrigir sem
+              precisar reimportar nada.
+            </p>
+          </div>
+        </div>
+        <Button variant="secondary" isLoading={reconciliando} disabled={reconciliando} onClick={reconciliarVinculos}>
+          Reconciliar vínculos
+          <span className="material-symbols-outlined text-[18px]">sync</span>
+        </Button>
+      </Card>
 
       {etapa === 'selecao' && (
         <Card className="p-8 flex flex-col items-center gap-4 text-center">
