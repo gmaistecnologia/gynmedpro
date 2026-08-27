@@ -28,9 +28,17 @@ export function salvarReportMedicoStatus(solicitacaoId: string, valores: StatusE
 // produzindo o trio completo que `salvarReportMedicoStatus` exige. Centralizado aqui porque toda
 // tela que edita o acompanhamento (detalhe da solicitação, lista de Solicitações) precisa do
 // mesmo merge antes de salvar.
+//
+// IMPORTANTE: `status_final` nunca pode sair daqui como ''. `statusFinalDe` devolve '' pra uma
+// solicitação nunca tocada — correto pra EXIBIÇÃO (não presumir "SOLICITADO" na tela), mas a
+// coluna no banco é NOT NULL com CHECK numa lista fixa de valores (não inclui ''). Confirmado em
+// 27/08/2026: salvar a Data Protocolo ou uma Observação como primeira edição de uma solicitação
+// (comum em solicitações antigas nunca tocadas pelo acompanhamento, já que status_final ainda
+// não foi definido) mandava status_final: '' pro banco e violava a constraint. Aqui cai pro
+// mesmo default que a própria coluna já usa ('SOLICITADO'), nunca ''.
 export function mesclarStatusExtra(atual: StatusExtra | null | undefined, patch: Partial<StatusExtra>): StatusExtra {
   return {
-    status_final: statusFinalDe(atual),
+    status_final: statusFinalDe(atual) || 'SOLICITADO',
     data_protocolo: dataProtocoloDe(atual),
     observacoes: observacoesDe(atual),
     ...patch,
