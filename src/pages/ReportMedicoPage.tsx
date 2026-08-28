@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../lib/auth'
 import { Card } from '../components/ui/Card'
 import { StatTile } from '../components/ui/StatTile'
 import { MultiSelectField } from '../components/ui/MultiSelectField'
 import { DateRangeField } from '../components/ui/DateRangeField'
 import { SolicitacaoDetailModal } from '../components/solicitacoes/SolicitacaoDetailModal'
+import { PersonalizarColunasModal } from '../components/relatorios/PersonalizarColunasModal'
 import {
   STATUS_FINAL_OPCOES,
   normalizarStatusFinal,
@@ -16,7 +18,9 @@ import {
 } from '../lib/reportMedicoStatus'
 import { alertaProtocolo, CLASSE_LINHA_ALERTA, LIMITE_DIAS_PROTOCOLADO, type Alerta } from '../lib/alertas'
 import { exportarReportMedicoExcel } from '../lib/exportReportMedico'
+import { COLUNAS_REPORT_MEDICO, type ColunaReportMedicoDef, type ColunaReportMedicoKey } from '../lib/colunasReportMedico'
 import { useReportMedicoStatusRealtime } from '../hooks/useReportMedicoStatusRealtime'
+import { useColunasPersonalizadas } from '../hooks/useColunasPersonalizadas'
 import { componentesIso, deslocarMes, hojeIso, paraIso } from '../lib/dateUtils'
 import type { SolicitacaoImportada } from '../lib/types'
 
@@ -183,6 +187,34 @@ function CampoIntervaloData({
 }
 
 export function ReportMedicoPage() {
+  const { profile } = useAuth()
+  // Gestor (gerente/admin) vê Representante + Médico; representante vê só Médico — o próprio
+  // nome dele já aparece em toda a tela (é ele quem está logado), não precisa de coluna.
+  const isGestor = profile?.role === 'gerente_comercial' || profile?.role === 'admin'
+  // Só admin personaliza colunas — `&&` (não `?.`) pra o TS estreitar `profile` como não-nulo
+  // dentro do próprio ternário.
+  const adminUserId = profile && profile.role === 'admin' ? profile.id : null
+
+  // Catálogo de colunas disponível pro papel atual (representante nunca vê "Representante"),
+  // preferência de exibição/ordem persistida só pra admin — os demais papéis sempre veem o
+  // catálogo na ordem padrão, sem opção de personalizar.
+  const colunasBase = useMemo(
+    () => COLUNAS_REPORT_MEDICO.filter((c) => !c.somenteGestor || isGestor),
+    [isGestor],
+  )
+  const colunasChaves = useMemo(() => colunasBase.map((c) => c.key), [colunasBase])
+  const { preferencia: preferenciaColunas, definirPreferencia: definirPreferenciaColunas, restaurarPadrao: restaurarColunasPadrao } =
+    useColunasPersonalizadas<ColunaReportMedicoKey>(adminUserId, colunasChaves)
+  const [colunasModalAberto, setColunasModalAberto] = useState(false)
+
+  const colunasVisiveis = useMemo(() => {
+    const porKey = new Map(colunasBase.map((c) => [c.key, c]))
+    return preferenciaColunas
+      .filter((item) => item.visivel || porKey.get(item.key)?.fixa)
+      .map((item) => porKey.get(item.key))
+      .filter((c): c is ColunaReportMedicoDef => Boolean(c))
+  }, [colunasBase, preferenciaColunas])
+
   const [linhas, setLinhas] = useState<Linha[]>([])
   const [loading, setLoading] = useState(true)
   const [filtros, setFiltros] = useState<Filtros>(filtrosVazios)
@@ -409,6 +441,182 @@ export function ReportMedicoPage() {
     } else {
       setSortKey(key)
       setSortDir('desc')
+    }
+  }
+
+  // th sortável: mesmo estilo/comportamento pras 3 colunas de data, só troca o rótulo e a chave.
+  // Recebe `chaveReact` (não usa o nome `key`, que o React trataria como prop especial e nunca
+  // repassaria pro componente) só pra manter o dado disponível — quem de fato aplica `key` é
+  // `renderCabecalhoColuna`, no `<CabecalhoOrdenavel key={chave} .../>` abaixo.
+  function CabecalhoOrdenavel({ chave, rotulo }: { chave: SortKey; rotulo: string }) {
+    return (
+      <th
+        style={estiloTituloFixo}
+        className={`lg:sticky z-20 bg-surface-container-low px-4 py-3 font-headline font-bold text-[11px] uppercase tracking-widest cursor-pointer select-none whitespace-nowrap transition-colors ${
+          sortKey === chave ? 'text-primary-container' : 'text-on-surface-variant hover:text-primary'
+        }`}
+        onClick={() => alternarOrdenacao(chave)}
+      >
+        <span className="inline-flex items-center gap-1">
+          {rotulo}
+          {sortKey === chave && (
+            <span className="material-symbols-outlined text-[14px]">
+              {sortDir === 'desc' ? 'arrow_downward' : 'arrow_upward'}
+            </span>
+          )}
+        </span>
+      </th>
+    )
+  }
+
+  // Cabeçalho simples (não ordenável): reaproveita a mesma classe base pra todas as colunas
+  // que não são "Paciente" (que usa px-6 em vez de px-4, por ser a primeira/mais destacada).
+  // `key` vai direto no elemento retornado — função comum, não componente, então o React só
+  // reconhece a key se ela estiver no `<th>` em si, nunca teria efeito num parâmetro qualquer.
+  function cabecalhoSimples(chaveReact: string, rotulo: string, destacado = false) {
+    return (
+      <th
+        key={chaveReact}
+        style={estiloTituloFixo}
+        className={`lg:sticky z-20 bg-surface-container-low ${destacado ? 'px-6' : 'px-4'} py-3 font-headline font-bold text-[11px] text-on-surface-variant uppercase tracking-widest`}
+      >
+        {rotulo}
+      </th>
+    )
+  }
+
+  // Um <th> por chave de coluna, na ordem/visibilidade escolhida (colunasVisiveis) — mantém o
+  // resto do JSX simples, sem duplicar a lógica de cada coluna em dois lugares. Retorna sempre o
+  // <th> direto (nunca embrulhado), porque filho de <tr> só pode ser <td>/<th>.
+  function renderCabecalhoColuna(chave: ColunaReportMedicoKey) {
+    switch (chave) {
+      case 'representante':
+        return cabecalhoSimples(chave, 'Representante')
+      case 'medico':
+        return cabecalhoSimples(chave, 'Médico')
+      case 'paciente':
+        return cabecalhoSimples(chave, 'Paciente', true)
+      case 'procedimento':
+        return cabecalhoSimples(chave, 'Procedimento')
+      case 'convenio':
+        return cabecalhoSimples(chave, 'Convênio')
+      case 'hospital':
+        return cabecalhoSimples(chave, 'Hospital')
+      case 'solicitacao':
+        return <CabecalhoOrdenavel key={chave} chave="data_solicitacao" rotulo="Solicitação" />
+      case 'protocolo':
+        return <CabecalhoOrdenavel key={chave} chave="data_protocolo" rotulo="Protocolo" />
+      case 'cirurgia':
+        return <CabecalhoOrdenavel key={chave} chave="data_cirurgia" rotulo="Cirurgia" />
+      case 'status':
+        return cabecalhoSimples(chave, 'Status Final')
+      case 'observacoes':
+        return cabecalhoSimples(chave, 'Observações')
+    }
+  }
+
+  function renderCelulaColuna(chave: ColunaReportMedicoKey, r: Linha, alerta: Alerta | null) {
+    switch (chave) {
+      case 'representante':
+        return (
+          <td key={chave} className="px-4 py-3 text-sm text-on-surface truncate max-w-[160px]">
+            {r.representante_nome ?? '—'}
+          </td>
+        )
+      case 'medico':
+        return (
+          <td key={chave} className="px-4 py-3 text-sm text-on-surface truncate max-w-[160px]">
+            {r.medico_nome ?? '—'}
+          </td>
+        )
+      case 'paciente':
+        return (
+          <td
+            key={chave}
+            className="px-6 py-3 text-sm font-bold text-secondary uppercase truncate max-w-[220px] hover:underline"
+          >
+            <span className="inline-flex items-center gap-1.5">
+              {alerta && (
+                <span className="material-symbols-outlined text-[16px] text-error shrink-0" aria-label={alerta.motivo}>
+                  warning
+                </span>
+              )}
+              {r.paciente_nome ?? '—'}
+            </span>
+          </td>
+        )
+      case 'procedimento':
+        return (
+          <td key={chave} className="px-4 py-3 text-sm text-on-surface truncate max-w-[180px]">
+            {r.descricao_tipo ?? '—'}
+          </td>
+        )
+      case 'convenio':
+        return (
+          <td key={chave} className="px-4 py-3 text-sm text-primary font-semibold truncate max-w-[160px]">
+            {r.plano_saude_nome ?? '—'}
+          </td>
+        )
+      case 'hospital':
+        return (
+          <td key={chave} className="px-4 py-3">
+            {r.hospital_nome ? (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-surface-container-high text-[11px] font-semibold text-on-surface-variant truncate max-w-[160px]">
+                {r.hospital_nome}
+              </span>
+            ) : (
+              <span className="text-on-surface-variant">—</span>
+            )}
+          </td>
+        )
+      case 'solicitacao':
+        return (
+          <td key={chave} className="px-4 py-3 text-sm text-on-surface whitespace-nowrap">
+            {formatDataBR(r.data_solicitacao)}
+          </td>
+        )
+      case 'protocolo':
+        return (
+          <td key={chave} className="px-4 py-3 text-sm whitespace-nowrap">
+            <span className={alerta ? 'font-bold text-error' : 'text-on-surface-variant'}>
+              {formatDataBR(dataProtocoloDe(r))}
+            </span>
+            {alerta && (
+              <span className="block text-[10px] font-semibold text-error uppercase tracking-wide">
+                {alerta.dias} dias parado
+              </span>
+            )}
+          </td>
+        )
+      case 'cirurgia':
+        return (
+          <td key={chave} className="px-4 py-3 text-sm text-on-surface-variant whitespace-nowrap">
+            {formatDataBR(r.data_cirurgia)}
+          </td>
+        )
+      case 'status':
+        return (
+          <td key={chave} className="px-4 py-3">
+            <span
+              className={`inline-flex items-center px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full border ${
+                alerta ? 'bg-error text-on-error border-error' : statusBadgeClasse(statusFinalDe(r))
+              }`}
+            >
+              {statusFinalDe(r)}
+            </span>
+            {alerta && (
+              <span className="block mt-1 text-[10px] font-semibold text-error leading-tight max-w-[200px]">
+                {alerta.motivo}
+              </span>
+            )}
+          </td>
+        )
+      case 'observacoes':
+        return (
+          <td key={chave} className="px-4 py-3 text-sm text-on-surface-variant truncate max-w-[220px]">
+            {observacoesDe(r) || '—'}
+          </td>
+        )
     }
   }
 
@@ -642,6 +850,16 @@ export function ReportMedicoPage() {
                 Carregando histórico completo…
               </span>
             )}
+            {adminUserId && (
+              <button
+                type="button"
+                onClick={() => setColunasModalAberto(true)}
+                className="inline-flex items-center gap-1.5 bg-surface-container-high text-secondary hover:bg-surface-container-highest rounded-lg text-xs font-semibold py-2 px-3.5 transition-colors"
+              >
+                <span className="material-symbols-outlined text-[16px]">view_column</span>
+                Personalizar colunas
+              </button>
+            )}
             <span className="bg-inverse-surface text-inverse-on-surface text-[11px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wide">
               {ordenadas.length} de {linhas.length} registros
             </span>
@@ -651,91 +869,12 @@ export function ReportMedicoPage() {
         <div className="overflow-x-auto lg:overflow-x-visible">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr>
-                <th
-                  style={estiloTituloFixo}
-                  className="lg:sticky z-20 bg-surface-container-low px-6 py-3 font-headline font-bold text-[11px] text-on-surface-variant uppercase tracking-widest">
-                  Paciente
-                </th>
-                <th
-                  style={estiloTituloFixo}
-                  className="lg:sticky z-20 bg-surface-container-low px-4 py-3 font-headline font-bold text-[11px] text-on-surface-variant uppercase tracking-widest">
-                  Procedimento
-                </th>
-                <th
-                  style={estiloTituloFixo}
-                  className="lg:sticky z-20 bg-surface-container-low px-4 py-3 font-headline font-bold text-[11px] text-on-surface-variant uppercase tracking-widest">
-                  Convênio
-                </th>
-                <th
-                  style={estiloTituloFixo}
-                  className="lg:sticky z-20 bg-surface-container-low px-4 py-3 font-headline font-bold text-[11px] text-on-surface-variant uppercase tracking-widest">
-                  Hospital
-                </th>
-                <th
-                  style={estiloTituloFixo}
-                  className={`lg:sticky z-20 bg-surface-container-low px-4 py-3 font-headline font-bold text-[11px] uppercase tracking-widest cursor-pointer select-none whitespace-nowrap transition-colors ${
-                    sortKey === 'data_solicitacao' ? 'text-primary-container' : 'text-on-surface-variant hover:text-primary'
-                  }`}
-                  onClick={() => alternarOrdenacao('data_solicitacao')}
-                >
-                  <span className="inline-flex items-center gap-1">
-                    Solicitação
-                    {sortKey === 'data_solicitacao' && (
-                      <span className="material-symbols-outlined text-[14px]">
-                        {sortDir === 'desc' ? 'arrow_downward' : 'arrow_upward'}
-                      </span>
-                    )}
-                  </span>
-                </th>
-                <th
-                  style={estiloTituloFixo}
-                  className={`lg:sticky z-20 bg-surface-container-low px-4 py-3 font-headline font-bold text-[11px] uppercase tracking-widest cursor-pointer select-none whitespace-nowrap transition-colors ${
-                    sortKey === 'data_protocolo' ? 'text-primary-container' : 'text-on-surface-variant hover:text-primary'
-                  }`}
-                  onClick={() => alternarOrdenacao('data_protocolo')}
-                >
-                  <span className="inline-flex items-center gap-1">
-                    Protocolo
-                    {sortKey === 'data_protocolo' && (
-                      <span className="material-symbols-outlined text-[14px]">
-                        {sortDir === 'desc' ? 'arrow_downward' : 'arrow_upward'}
-                      </span>
-                    )}
-                  </span>
-                </th>
-                <th
-                  style={estiloTituloFixo}
-                  className={`lg:sticky z-20 bg-surface-container-low px-4 py-3 font-headline font-bold text-[11px] uppercase tracking-widest cursor-pointer select-none whitespace-nowrap transition-colors ${
-                    sortKey === 'data_cirurgia' ? 'text-primary-container' : 'text-on-surface-variant hover:text-primary'
-                  }`}
-                  onClick={() => alternarOrdenacao('data_cirurgia')}
-                >
-                  <span className="inline-flex items-center gap-1">
-                    Cirurgia
-                    {sortKey === 'data_cirurgia' && (
-                      <span className="material-symbols-outlined text-[14px]">
-                        {sortDir === 'desc' ? 'arrow_downward' : 'arrow_upward'}
-                      </span>
-                    )}
-                  </span>
-                </th>
-                <th
-                  style={estiloTituloFixo}
-                  className="lg:sticky z-20 bg-surface-container-low px-4 py-3 font-headline font-bold text-[11px] text-on-surface-variant uppercase tracking-widest">
-                  Status Final
-                </th>
-                <th
-                  style={estiloTituloFixo}
-                  className="lg:sticky z-20 bg-surface-container-low px-4 py-3 font-headline font-bold text-[11px] text-on-surface-variant uppercase tracking-widest">
-                  Observações
-                </th>
-              </tr>
+              <tr>{colunasVisiveis.map((c) => renderCabecalhoColuna(c.key))}</tr>
             </thead>
             <tbody className="divide-y divide-surface-container-high">
               {visiveis.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-8 text-center text-sm text-on-surface-variant">
+                  <td colSpan={colunasVisiveis.length} className="px-6 py-8 text-center text-sm text-on-surface-variant">
                     {linhas.length === 0
                       ? 'Nenhuma solicitação importada ainda.'
                       : 'Nenhum registro encontrado para os filtros selecionados.'}
@@ -745,78 +884,18 @@ export function ReportMedicoPage() {
                 visiveis.map((r) => {
                   const alerta = alertaDe(r)
                   return (
-                  <tr
-                    key={r.id}
-                    onClick={() => setSelecionadaId(r.id)}
-                    title={alerta?.motivo}
-                    className={`cursor-pointer transition-colors ${
-                      alerta
-                        ? CLASSE_LINHA_ALERTA
-                        : `hover:bg-surface-container-high/40 ${statusBordaClasse(statusFinalDe(r))}`
-                    }`}
-                  >
-                    <td className="px-6 py-3 text-sm font-bold text-secondary uppercase truncate max-w-[220px] hover:underline">
-                      <span className="inline-flex items-center gap-1.5">
-                        {alerta && (
-                          <span
-                            className="material-symbols-outlined text-[16px] text-error shrink-0"
-                            aria-label={alerta.motivo}
-                          >
-                            warning
-                          </span>
-                        )}
-                        {r.paciente_nome ?? '—'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-on-surface truncate max-w-[180px]">
-                      {r.descricao_tipo ?? '—'}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-primary font-semibold truncate max-w-[160px]">
-                      {r.plano_saude_nome ?? '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      {r.hospital_nome ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-surface-container-high text-[11px] font-semibold text-on-surface-variant truncate max-w-[160px]">
-                          {r.hospital_nome}
-                        </span>
-                      ) : (
-                        <span className="text-on-surface-variant">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-on-surface whitespace-nowrap">
-                      {formatDataBR(r.data_solicitacao)}
-                    </td>
-                    <td className="px-4 py-3 text-sm whitespace-nowrap">
-                      <span className={alerta ? 'font-bold text-error' : 'text-on-surface-variant'}>
-                        {formatDataBR(dataProtocoloDe(r))}
-                      </span>
-                      {alerta && (
-                        <span className="block text-[10px] font-semibold text-error uppercase tracking-wide">
-                          {alerta.dias} dias parado
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-on-surface-variant whitespace-nowrap">
-                      {formatDataBR(r.data_cirurgia)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full border ${
-                          alerta ? 'bg-error text-on-error border-error' : statusBadgeClasse(statusFinalDe(r))
-                        }`}
-                      >
-                        {statusFinalDe(r)}
-                      </span>
-                      {alerta && (
-                        <span className="block mt-1 text-[10px] font-semibold text-error leading-tight max-w-[200px]">
-                          {alerta.motivo}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-on-surface-variant truncate max-w-[220px]">
-                      {observacoesDe(r) || '—'}
-                    </td>
-                  </tr>
+                    <tr
+                      key={r.id}
+                      onClick={() => setSelecionadaId(r.id)}
+                      title={alerta?.motivo}
+                      className={`cursor-pointer transition-colors ${
+                        alerta
+                          ? CLASSE_LINHA_ALERTA
+                          : `hover:bg-surface-container-high/40 ${statusBordaClasse(statusFinalDe(r))}`
+                      }`}
+                    >
+                      {colunasVisiveis.map((c) => renderCelulaColuna(c.key, r, alerta))}
+                    </tr>
                   )
                 })
               )}
@@ -856,6 +935,15 @@ export function ReportMedicoPage() {
       </Card>
 
       <SolicitacaoDetailModal id={selecionadaId} onClose={fecharModal} />
+
+      <PersonalizarColunasModal
+        aberto={colunasModalAberto}
+        colunas={colunasBase}
+        preferencia={preferenciaColunas}
+        onMudarPreferencia={definirPreferenciaColunas}
+        onRestaurarPadrao={restaurarColunasPadrao}
+        onFechar={() => setColunasModalAberto(false)}
+      />
     </div>
   )
 }

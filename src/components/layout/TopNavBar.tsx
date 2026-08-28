@@ -12,7 +12,10 @@ export function TopNavBar() {
   }
 
   return (
-    <header className="fixed top-0 left-0 w-full h-16 flex items-center justify-between px-4 sm:px-6 glass-effect z-50 border-b border-outline-variant/10">
+    // `glass-effect` (translúcida + blur) deixava o texto das linhas da tabela "vazando" por
+    // trás ao rolar a página — 80% de opacidade nunca esconde 100% do que passa atrás, só
+    // borra. Fundo sólido (mesmo tom elevado dos Cards) resolve de vez, sem depender de blur.
+    <header className="fixed top-0 left-0 w-full h-16 flex items-center justify-between px-4 sm:px-6 bg-surface-container-lowest shadow-sm z-50 border-b border-outline-variant/10">
       <div className="flex items-center gap-2 min-w-0">
         <span className="font-headline font-black text-xl sm:text-2xl tracking-tight text-gynmed-dark shrink-0">
           Gynmed
