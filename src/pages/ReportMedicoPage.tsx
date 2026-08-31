@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
@@ -32,9 +32,6 @@ const SELECT_COM_STATUS =
 const SITUACAO_OCULTA = 'Reprovado'
 
 const TAMANHO_PAGINA = 50
-
-// Altura da TopNavBar fixa (h-16). É a partir dela que o cabeçalho da tabela gruda.
-const ALTURA_TOPNAV = 64
 
 const STATUS_EM_ABERTO = ['SOLICITADO', 'PROTOCOLADO']
 const STATUS_AUTORIZADAS = ['AUTORIZADO', 'AGENDADO', 'PENDÊNCIA AGENDAMENTO']
@@ -245,20 +242,6 @@ export function ReportMedicoPage() {
     }
   }
 
-  // O cabeçalho da Card (título + contador) e a linha de títulos da tabela grudam juntos no topo
-  // da janela. Como os dois são sticky, o segundo precisa saber a altura exata do primeiro —
-  // medida em tempo real, porque o bloco cresce quando o texto quebra em telas mais estreitas.
-  const cabecalhoRef = useRef<HTMLDivElement>(null)
-  const [alturaCabecalho, setAlturaCabecalho] = useState(0)
-
-  useEffect(() => {
-    const elemento = cabecalhoRef.current
-    if (!elemento) return
-    const observador = new ResizeObserver(() => setAlturaCabecalho(elemento.offsetHeight))
-    observador.observe(elemento)
-    return () => observador.disconnect()
-  }, [loading])
-
   useEffect(() => {
     let cancelado = false
     const { de, ate } = periodoSolicitacaoPadrao()
@@ -432,9 +415,6 @@ export function ReportMedicoPage() {
     return { emAberto, autorizadas, cirurgias, negativas, alertas, pctCirurgias }
   }, [filtradas])
 
-  // Compartilhado pelas 9 colunas: `top` do sticky = barra fixa do topo + cabeçalho da Card.
-  const estiloTituloFixo = { top: ALTURA_TOPNAV + alturaCabecalho }
-
   function alternarOrdenacao(key: SortKey) {
     if (key === sortKey) {
       setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))
@@ -451,8 +431,7 @@ export function ReportMedicoPage() {
   function CabecalhoOrdenavel({ chave, rotulo }: { chave: SortKey; rotulo: string }) {
     return (
       <th
-        style={estiloTituloFixo}
-        className={`lg:sticky z-20 bg-surface-container-low px-4 py-3 font-headline font-bold text-[11px] uppercase tracking-widest cursor-pointer select-none whitespace-nowrap transition-colors ${
+        className={`sticky top-0 z-20 bg-surface-container-low px-4 py-3 font-headline font-bold text-[11px] uppercase tracking-widest cursor-pointer select-none whitespace-nowrap transition-colors ${
           sortKey === chave ? 'text-primary-container' : 'text-on-surface-variant hover:text-primary'
         }`}
         onClick={() => alternarOrdenacao(chave)}
@@ -477,8 +456,7 @@ export function ReportMedicoPage() {
     return (
       <th
         key={chaveReact}
-        style={estiloTituloFixo}
-        className={`lg:sticky z-20 bg-surface-container-low ${destacado ? 'px-6' : 'px-4'} py-3 font-headline font-bold text-[11px] text-on-surface-variant uppercase tracking-widest`}
+        className={`sticky top-0 z-20 bg-surface-container-low ${destacado ? 'px-6' : 'px-4'} py-3 font-headline font-bold text-[11px] text-on-surface-variant uppercase tracking-widest`}
       >
         {rotulo}
       </th>
@@ -825,15 +803,15 @@ export function ReportMedicoPage() {
         />
       </section>
 
-      {/* `overflow-visible` a partir de lg: um contêiner com overflow no eixo X passa a ser o
-          scrollport dos filhos sticky, e aí o cabeçalho grudaria nele (que não rola) em vez da
-          janela. Abaixo de lg a tabela não cabe na largura, então lá vale mais a rolagem
-          horizontal do que o cabeçalho fixo. */}
-      <Card className="overflow-hidden lg:overflow-visible">
-        <div
-          ref={cabecalhoRef}
-          className="flex items-center justify-between px-6 py-5 border-b border-outline-variant/10 bg-surface-container-lowest rounded-t-xl lg:sticky lg:top-16 lg:z-30"
-        >
+      {/* A tabela virou seu próprio scroller (X e Y) com o cabeçalho `sticky top-0` relativo a
+          ELE, não à janela — mesmo padrão já usado em Solicitações. Necessário porque o CSS não
+          deixa combinar "overflow-x: auto" com um sticky grudado na janela no mesmo elemento:
+          assim que um eixo deixa de ser `visible`, o navegador promove o outro pra `auto`
+          também (mesmo escrito `overflow-y: visible` explicitamente), e o sticky passa a se
+          referir a esse contêiner local em vez do viewport. Confirmado testando os dois casos
+          lado a lado (ver sessão de 2026-08-29) antes de trocar a abordagem anterior. */}
+      <Card className="overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-outline-variant/10">
           <div>
             <h2 className="font-headline font-bold text-lg text-secondary">Registros · Report Médico</h2>
             <p className="text-xs text-on-surface-variant mt-0.5">
@@ -866,7 +844,7 @@ export function ReportMedicoPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto lg:overflow-x-visible">
+        <div className="overflow-auto max-h-[65vh]">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr>{colunasVisiveis.map((c) => renderCabecalhoColuna(c.key))}</tr>

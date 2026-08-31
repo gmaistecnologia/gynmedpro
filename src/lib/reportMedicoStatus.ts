@@ -48,7 +48,12 @@ export function mesclarStatusExtra(atual: StatusExtra | null | undefined, patch:
 // Sem registro em report_medico_status, a solicitação ainda não foi tocada pelo time de
 // acompanhamento — o campo fica em branco, fiel ao que veio da planilha importada, em vez de
 // presumir 'SOLICITADO'.
-export function statusFinalDe(extra: StatusExtra | null | undefined): string {
+//
+// Aceita só `Pick<StatusExtra, 'status_final'>` (não o StatusExtra inteiro) porque telas que só
+// precisam do status — ex. o Painel Comercial, que classifica pipeline/realizada — não têm por
+// que buscar `data_protocolo`/`observacoes` do banco à toa. Todo StatusExtra completo já
+// satisfaz esse tipo, então nenhum chamador existente precisa mudar.
+export function statusFinalDe(extra: Pick<StatusExtra, 'status_final'> | null | undefined): string {
   return normalizarStatusFinal(extra?.status_final ?? '')
 }
 

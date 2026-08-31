@@ -1,9 +1,47 @@
 import { Fragment, useMemo, useState } from 'react'
 import { Card } from '../ui/Card'
 import { UsuarioInativoBadge } from '../ui/UsuarioInativoBadge'
-import type { MetaComercial, MetaRepresentante, ProfileCompleto, SolicitacaoImportada } from '../../lib/types'
+import { statusFinalDe } from '../../lib/reportMedicoStatus'
+import { hojeIso } from '../../lib/dateUtils'
+import type {
+  MetaComercial,
+  MetaRepresentante,
+  ProfileCompleto,
+  SolicitacaoImportadaComStatus,
+} from '../../lib/types'
 
-const SITUACOES_REALIZADAS = ['Faturado', 'Cirurgia realizada']
+// "Cirurgias"/"Parcial"/"Agend."/"Fech. Parcial" replicam a planilha de referência (SAGA
+// DIÁRIO.xlsx): data + situação da própria solicitação, não o rastreamento manual em
+// report_medico_status — ver o comentário completo (e o porquê da mudança) em RelatoriosPage.tsx.
+const SITUACAO_REPROVADA = 'Reprovado'
+
+// "Cot. a Vencer" continua vindo de status_final (SOLICITADO+PROTOCOLADO): é "carteira em
+// aberto", sem filtro de mês — não fazia parte da correção acima, que era só sobre os 4 KPIs
+// financeiros do mês de referência.
+const STATUS_EM_ABERTO = ['SOLICITADO', 'PROTOCOLADO']
+
+function cirurgiaRealizadaNoMes(s: SolicitacaoImportadaComStatus, mesReferencia: string, hoje: string): boolean {
+  return (
+    !!s.data_cirurgia &&
+    mesKeyDe(s.data_cirurgia) === mesReferencia &&
+    s.data_cirurgia < hoje &&
+    s.situacao !== SITUACAO_REPROVADA
+  )
+}
+
+function agendadaNoMes(s: SolicitacaoImportadaComStatus, mesReferencia: string, hoje: string): boolean {
+  return (
+    !!s.data_cirurgia &&
+    mesKeyDe(s.data_cirurgia) === mesReferencia &&
+    !cirurgiaRealizadaNoMes(s, mesReferencia, hoje)
+  )
+}
+
+// Uma cirurgia realizada pode ainda não ter o valor final faturado (`valor_realizado` vem 0
+// explícito no banco, nunca null) — usa o valor orçado como estimativa até lá. `||`, não `??`.
+function valorRealizadoOuOrcamento(s: SolicitacaoImportadaComStatus): number {
+  return s.valor_realizado || s.valor_orcamento || 0
+}
 
 const currencyFull = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 const currencyCompact = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
@@ -65,7 +103,7 @@ export function PerformanceRepresentanteTable({
   mesLabel,
   inativos,
 }: {
-  solicitacoes: SolicitacaoImportada[]
+  solicitacoes: SolicitacaoImportadaComStatus[]
   meta: MetaComercial | undefined
   metasRep: MetaRepresentante[]
   mesReferencia: string
@@ -73,6 +111,7 @@ export function PerformanceRepresentanteTable({
   /** Cadastro de perfis por nome (ver useProfilesDirectory), pra sinalizar representante inativo. */
   inativos?: Map<string, Pick<ProfileCompleto, 'ativo'>>
 }) {
+  const hoje = hojeIso()
   const [sortKey, setSortKey] = useState<SortKey>('fechParcial')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set())
@@ -105,20 +144,20 @@ export function PerformanceRepresentanteTable({
       const doRepNoMes = doMes.filter((s) => s.representante_nome === nome)
       const doRepTodoPeriodo = solicitacoes.filter((s) => s.representante_nome === nome)
 
-      const realizadasDoRep = doRepNoMes.filter((s) => s.situacao && SITUACOES_REALIZADAS.includes(s.situacao))
-      const parcial = realizadasDoRep.reduce((soma, s) => soma + (s.valor_realizado ?? 0), 0)
+      const realizadasDoRep = doRepNoMes.filter((s) => cirurgiaRealizadaNoMes(s, mesReferencia, hoje))
+      const parcial = realizadasDoRep.reduce((soma, s) => soma + valorRealizadoOuOrcamento(s), 0)
       const agendado = doRepNoMes
-        .filter((s) => s.situacao === 'Aprovado')
+        .filter((s) => agendadaNoMes(s, mesReferencia, hoje))
         .reduce((soma, s) => soma + (s.valor_orcamento ?? 0), 0)
 
       const nomesMedicos = new Set(doRepNoMes.map((s) => s.medico_nome).filter((v): v is string => Boolean(v)))
       const medicos: MedicoLinha[] = Array.from(nomesMedicos)
         .map((medicoNome) => {
           const doMedico = doRepNoMes.filter((s) => s.medico_nome === medicoNome)
-          const realizadasDoMedico = doMedico.filter((s) => s.situacao && SITUACOES_REALIZADAS.includes(s.situacao))
-          const parcialMedico = realizadasDoMedico.reduce((soma, s) => soma + (s.valor_realizado ?? 0), 0)
+          const realizadasDoMedico = doMedico.filter((s) => cirurgiaRealizadaNoMes(s, mesReferencia, hoje))
+          const parcialMedico = realizadasDoMedico.reduce((soma, s) => soma + valorRealizadoOuOrcamento(s), 0)
           const agendadoMedico = doMedico
-            .filter((s) => s.situacao === 'Aprovado')
+            .filter((s) => agendadaNoMes(s, mesReferencia, hoje))
             .reduce((soma, s) => soma + (s.valor_orcamento ?? 0), 0)
           return {
             nome: medicoNome,
@@ -142,11 +181,12 @@ export function PerformanceRepresentanteTable({
         cirurgias: realizadasDoRep.length,
         positivados: new Set(realizadasDoRep.map((s) => s.medico_nome).filter(Boolean)).size,
         carteira: doRepTodoPeriodo.length,
-        cotAVencer: doRepTodoPeriodo.filter((s) => s.situacao === 'A vencer').length,
+        cotAVencer: doRepTodoPeriodo.filter((s) => STATUS_EM_ABERTO.includes(statusFinalDe(s.report_medico_status)))
+          .length,
         medicos,
       }
     })
-  }, [solicitacoes, metasRep, mesReferencia])
+  }, [solicitacoes, metasRep, mesReferencia, hoje])
 
   const linhasOrdenadas = useMemo(() => {
     const copia = [...linhas]
@@ -160,10 +200,10 @@ export function PerformanceRepresentanteTable({
 
   const totais = useMemo(() => {
     const doMes = solicitacoes.filter((s) => s.data_cirurgia && mesKeyDe(s.data_cirurgia) === mesReferencia)
-    const realizadas = doMes.filter((s) => s.situacao && SITUACOES_REALIZADAS.includes(s.situacao))
-    const parcial = realizadas.reduce((soma, s) => soma + (s.valor_realizado ?? 0), 0)
+    const realizadas = doMes.filter((s) => cirurgiaRealizadaNoMes(s, mesReferencia, hoje))
+    const parcial = realizadas.reduce((soma, s) => soma + valorRealizadoOuOrcamento(s), 0)
     const agendado = doMes
-      .filter((s) => s.situacao === 'Aprovado')
+      .filter((s) => agendadaNoMes(s, mesReferencia, hoje))
       .reduce((soma, s) => soma + (s.valor_orcamento ?? 0), 0)
     return {
       metaSugerida: meta?.meta_valor ?? null,
@@ -173,9 +213,9 @@ export function PerformanceRepresentanteTable({
       cirurgias: realizadas.length,
       positivados: new Set(realizadas.map((s) => s.medico_nome).filter(Boolean)).size,
       carteira: solicitacoes.length,
-      cotAVencer: solicitacoes.filter((s) => s.situacao === 'A vencer').length,
+      cotAVencer: solicitacoes.filter((s) => STATUS_EM_ABERTO.includes(statusFinalDe(s.report_medico_status))).length,
     }
-  }, [solicitacoes, meta, mesReferencia])
+  }, [solicitacoes, meta, mesReferencia, hoje])
 
   return (
     <Card className="overflow-hidden">

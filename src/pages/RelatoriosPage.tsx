@@ -21,16 +21,58 @@ import { MultiSelectField } from '../components/ui/MultiSelectField'
 import { PerformanceRepresentanteTable } from '../components/relatorios/PerformanceRepresentanteTable'
 import { PipelineComercialTable } from '../components/relatorios/PipelineComercialTable'
 import { useProfilesDirectory } from '../hooks/useProfilesDirectory'
-import type { SolicitacaoImportada, MetaComercial, MetaRepresentante } from '../lib/types'
+import { hojeIso } from '../lib/dateUtils'
+import type { SolicitacaoImportadaComStatus, MetaComercial, MetaRepresentante } from '../lib/types'
 
 const BRAND = '#1271d8'
 const AXIS_TICK = { fontSize: 12, fill: '#727784', fontFamily: 'Inter' }
 const GRID_COLOR = '#e1e3e4'
 
-// Situações que representam cirurgias efetivamente realizadas (faturadas ou sem número de
-// orçamento formal, mas já concluídas). "Aprovado" ainda não é uma cirurgia realizada — é
-// pipeline (agendado/aprovado, aguardando faturamento). "Vencido"/"A vencer" nunca aconteceram.
-const SITUACOES_REALIZADAS = ['Faturado', 'Cirurgia realizada']
+// Réplica fiel da planilha de referência (SAGA DIÁRIO.xlsx, aba COTAÇÕES): uma cirurgia é
+// "realizada" quando a Data cirurgia já passou (estritamente antes de hoje — uma cirurgia
+// marcada para HOJE ainda não "aconteceu" pra fins desse cálculo) e a Situação não é
+// "Reprovado". Não depende do rastreamento manual em report_medico_status — o critério é só
+// data + situação, robusto mesmo quando uma solicitação nunca foi tocada no Report Médico.
+//
+// Essa é a SEGUNDA versão dessa lógica: a primeira (2026-08-31, ver git blame) usava
+// report_medico_status.status_final — mais "correta" em teoria (rastreamento contínuo, mesma
+// fonte usada no resto do app), mas não batia com o sistema de referência porque 150 das 374
+// solicitações de agosto/26 nunca tiveram status registrado ali. Confirmado com o time: o
+// sistema de referência nunca dependeu desse rastreamento manual — só data e situação da
+// própria planilha importada.
+const SITUACAO_REPROVADA = 'Reprovado'
+
+/** true quando `dataCirurgia` já passou (estritamente antes de `hoje`) — ambas 'YYYY-MM-DD'. */
+function jaAconteceu(dataCirurgia: string, hoje: string): boolean {
+  return dataCirurgia < hoje
+}
+
+/** CIRURGIAS REALIZADAS = 1 na planilha de referência. */
+function cirurgiaRealizadaNoMes(s: SolicitacaoImportadaComStatus, mesReferencia: string, hoje: string): boolean {
+  return (
+    !!s.data_cirurgia &&
+    mesKeyDe(s.data_cirurgia) === mesReferencia &&
+    jaAconteceu(s.data_cirurgia, hoje) &&
+    s.situacao !== SITUACAO_REPROVADA
+  )
+}
+
+/** CIRURGIAS REALIZADAS = 0: no mês de referência, mas ainda não satisfaz a condição acima
+ * (data futura, ou já passou mas foi reprovada). Base do valor "Agendamentos". */
+function agendadaNoMes(s: SolicitacaoImportadaComStatus, mesReferencia: string, hoje: string): boolean {
+  return (
+    !!s.data_cirurgia &&
+    mesKeyDe(s.data_cirurgia) === mesReferencia &&
+    !cirurgiaRealizadaNoMes(s, mesReferencia, hoje)
+  )
+}
+
+// Uma cirurgia realizada pode ainda não ter o valor final faturado (`valor_realizado` vem 0
+// explícito no banco, nunca null, até o fechamento financeiro) — usa o valor orçado como
+// estimativa até lá. `||`, não `??`: 0 deve mesmo cair pro fallback aqui.
+function valorRealizadoOuOrcamento(s: SolicitacaoImportadaComStatus): number {
+  return s.valor_realizado || s.valor_orcamento || 0
+}
 
 const MESES_ABREV = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ']
 
@@ -40,7 +82,7 @@ const MESES_ABREV = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SE
 const CAMPOS_SOLICITACOES =
   'id, paciente_nome, data_cirurgia, situacao, valor_realizado, valor_orcamento, representante_nome, ' +
   'descricao_tipo, medico_nome, plano_saude_nome, hospital_nome, nro_agendamento, nro_orcamento, ' +
-  'data_solicitacao, data_orcamento, data_aprovacao'
+  'data_solicitacao, data_orcamento, data_aprovacao, report_medico_status(status_final)'
 
 function mesRefAtual(): string {
   const now = new Date()
@@ -94,7 +136,10 @@ function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
 export function RelatoriosPage() {
   const { profile } = useAuth()
   const { porNome: perfisPorNome } = useProfilesDirectory()
-  const [solicitacoes, setSolicitacoes] = useState<SolicitacaoImportada[]>([])
+  // "HOJE" da fórmula de referência é a data real do sistema — não muda com o mês selecionado
+  // no filtro (que pode ser um mês passado, pra ver histórico).
+  const hoje = hojeIso()
+  const [solicitacoes, setSolicitacoes] = useState<SolicitacaoImportadaComStatus[]>([])
   const [metas, setMetas] = useState<MetaComercial[]>([])
   const [metasRep, setMetasRep] = useState<MetaRepresentante[]>([])
   const [loading, setLoading] = useState(true)
@@ -108,7 +153,7 @@ export function RelatoriosPage() {
   useEffect(() => {
     async function load() {
       const [solicitacoesData, { data: metasData }, { data: metasRepData }] = await Promise.all([
-        fetchTodasPaginas<SolicitacaoImportada>((offset, limite) =>
+        fetchTodasPaginas<SolicitacaoImportadaComStatus>((offset, limite) =>
           supabase
             .from('solicitacoes_importadas')
             .select(CAMPOS_SOLICITACOES)
@@ -116,7 +161,7 @@ export function RelatoriosPage() {
             .range(offset, offset + limite - 1)
             // CAMPOS_SOLICITACOES é uma variável (não um literal), então o supabase-js não
             // consegue inferir o formato exato da linha selecionada a partir da string.
-            .then(({ data, error }) => ({ data: data as unknown as SolicitacaoImportada[] | null, error })),
+            .then(({ data, error }) => ({ data: data as unknown as SolicitacaoImportadaComStatus[] | null, error })),
         ),
         supabase.from('metas_comerciais').select('*'),
         supabase.from('metas_representantes').select('*'),
@@ -198,11 +243,11 @@ export function RelatoriosPage() {
     for (const chave of chaves) porMes.set(chave, { valor: 0, qtde: 0 })
 
     for (const s of filtradas) {
-      if (!s.data_cirurgia || !s.situacao || !SITUACOES_REALIZADAS.includes(s.situacao)) continue
+      if (!s.data_cirurgia) continue
       const chave = mesKeyDe(s.data_cirurgia)
       const bucket = porMes.get(chave)
-      if (!bucket) continue
-      bucket.valor += s.valor_realizado ?? 0
+      if (!bucket || !cirurgiaRealizadaNoMes(s, chave, hoje)) continue
+      bucket.valor += valorRealizadoOuOrcamento(s)
       bucket.qtde += 1
     }
 
@@ -212,28 +257,30 @@ export function RelatoriosPage() {
       valor: porMes.get(chave)!.valor,
       qtde: porMes.get(chave)!.qtde,
     }))
-  }, [filtradas, mesesDisponiveis])
+  }, [filtradas, mesesDisponiveis, hoje])
 
   const doMes = useMemo(() => {
     return filtradas.filter((s) => s.data_cirurgia && mesKeyDe(s.data_cirurgia) === mesReferencia)
   }, [filtradas, mesReferencia])
 
   const realizadasDoMes = useMemo(
-    () => doMes.filter((s) => s.situacao && SITUACOES_REALIZADAS.includes(s.situacao)),
-    [doMes],
+    () => doMes.filter((s) => cirurgiaRealizadaNoMes(s, mesReferencia, hoje)),
+    [doMes, mesReferencia, hoje],
   )
 
   const parcialValor = useMemo(
-    () => realizadasDoMes.reduce((soma, s) => soma + (s.valor_realizado ?? 0), 0),
+    () => realizadasDoMes.reduce((soma, s) => soma + valorRealizadoOuOrcamento(s), 0),
     [realizadasDoMes],
   )
 
   const fechParcialValor = useMemo(() => {
-    const aprovadoPipeline = doMes
-      .filter((s) => s.situacao === 'Aprovado')
+    // "Agendamentos": no mês de referência, mas ainda não realizada (data futura, ou já
+    // passada porém reprovada) — soma o valor orçado, já que ainda não há valor final.
+    const agendamentosValor = doMes
+      .filter((s) => agendadaNoMes(s, mesReferencia, hoje))
       .reduce((soma, s) => soma + (s.valor_orcamento ?? 0), 0)
-    return parcialValor + aprovadoPipeline
-  }, [doMes, parcialValor])
+    return parcialValor + agendamentosValor
+  }, [doMes, mesReferencia, hoje, parcialValor])
 
   const cirurgiasCount = realizadasDoMes.length
 

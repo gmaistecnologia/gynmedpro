@@ -27,6 +27,14 @@ export type MetaComercial = Tables<'metas_comerciais'>
 export type MetaRepresentante = Tables<'metas_representantes'>
 export type ReportMedicoStatus = Tables<'report_medico_status'>
 
+// Usado pelo Painel Comercial (RelatoriosPage e as tabelas que ele alimenta): o pipeline
+// financeiro (cotação/autorização/cirurgia realizada) precisa do rastreamento operacional em
+// `report_medico_status.status_final`, não da coluna `situacao` (snapshot estático da planilha
+// importada, que não reflete o progresso feito depois pelo time — ver correção de 2026-08-31).
+export type SolicitacaoImportadaComStatus = SolicitacaoImportada & {
+  report_medico_status: Pick<ReportMedicoStatus, 'status_final'> | null
+}
+
 export type SolicitacaoComRelacoes = SolicitacaoCirurgica & {
   hospitais: Pick<Hospital, 'id' | 'nome_fantasia' | 'cidade' | 'uf'> | null
   profiles: Pick<ProfileCompleto, 'id' | 'nome' | 'ativo'> | null

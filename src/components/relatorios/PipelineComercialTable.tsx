@@ -1,9 +1,38 @@
 import { Fragment, useMemo, useState } from 'react'
 import { Card } from '../ui/Card'
 import { StatusBadge } from '../ui/StatusBadge'
-import type { SolicitacaoImportada } from '../../lib/types'
+import { statusFinalDe } from '../../lib/reportMedicoStatus'
+import { hojeIso } from '../../lib/dateUtils'
+import type { SolicitacaoImportadaComStatus } from '../../lib/types'
 
-const SITUACOES_REALIZADAS = ['Faturado', 'Cirurgia realizada']
+// "Cotações"/"Autorizações" (carteira em aberto, sem filtro de mês) continuam vindo de
+// status_final — o rastreamento manual em report_medico_status ainda é a fonte certa pra "onde
+// está" cada cotação no funil. Nota: SEM "AGENDADO" em autorizações — reflete literalmente o
+// critério validado com o sistema de referência (ver comentário completo em RelatoriosPage.tsx).
+const STATUS_EM_ABERTO = ['SOLICITADO', 'PROTOCOLADO']
+const STATUS_AUTORIZADAS = ['AUTORIZADO', 'PENDÊNCIA AGENDAMENTO']
+
+// "Agendamentos"/"Cirurgias Realizadas" (mês de referência) replicam a planilha de referência:
+// data + situação da própria solicitação, não o rastreamento manual — ver RelatoriosPage.tsx.
+const SITUACAO_REPROVADA = 'Reprovado'
+
+function cirurgiaRealizadaNoMes(s: SolicitacaoImportadaComStatus, mesReferencia: string, hoje: string): boolean {
+  return (
+    !!s.data_cirurgia &&
+    mesKeyDe(s.data_cirurgia) === mesReferencia &&
+    s.data_cirurgia < hoje &&
+    s.situacao !== SITUACAO_REPROVADA
+  )
+}
+
+function agendadaNoMes(s: SolicitacaoImportadaComStatus, mesReferencia: string, hoje: string): boolean {
+  return (
+    !!s.data_cirurgia &&
+    mesKeyDe(s.data_cirurgia) === mesReferencia &&
+    !cirurgiaRealizadaNoMes(s, mesReferencia, hoje)
+  )
+}
+
 const SEM_MEDICO = 'Sem médico informado'
 const SEM_PACIENTE = 'Sem paciente informado'
 
@@ -23,12 +52,15 @@ function formatarDataBR(dataIso: string | null): string | null {
 
 // Melhor data disponível para representar o item na linha do tempo do paciente: a da cirurgia
 // quando já aconteceu/está marcada, senão a última etapa do fluxo já preenchida.
-function melhorDataDe(item: SolicitacaoImportada): string | null {
+function melhorDataDe(item: SolicitacaoImportadaComStatus): string | null {
   return item.data_cirurgia ?? item.data_aprovacao ?? item.data_orcamento ?? item.data_solicitacao ?? null
 }
 
-function valorDoItem(item: SolicitacaoImportada): number {
-  return item.valor_realizado ?? item.valor_orcamento ?? 0
+// `||`, não `??`: quando uma cirurgia já é CIRURGIA REALIZADA mas o valor final ainda não foi
+// faturado, `valor_realizado` vem 0 explícito no banco (nunca null) — `??` não cairia pro
+// orçamento nesse caso e mostraria R$0,00 pra uma cirurgia que já aconteceu.
+function valorDoItem(item: SolicitacaoImportadaComStatus): number {
+  return item.valor_realizado || item.valor_orcamento || 0
 }
 
 type Metrics = {
@@ -42,9 +74,9 @@ type Metrics = {
   cirurgiasValor: number
 }
 
-type StatusFluxo = 'saudavel' | 'sem_cadencia' | 'sem_frequencia'
+type StatusFluxo = 'saudavel' | 'sem_cadencia' | 'sem_frequencia' | 'sem_movimento'
 
-type PacienteNode = { nome: string; metrics: Metrics; status: StatusFluxo; itens: SolicitacaoImportada[] }
+type PacienteNode = { nome: string; metrics: Metrics; status: StatusFluxo; itens: SolicitacaoImportadaComStatus[] }
 type MedicoNode = { nome: string; metrics: Metrics; status: StatusFluxo; pacientes: PacienteNode[] }
 type RepNode = { nome: string; metrics: Metrics; medicos: MedicoNode[] }
 
@@ -57,17 +89,13 @@ const COLUNAS: { key: SortKey; label: string; sub: string }[] = [
   { key: 'cirurgiasValor', label: 'Cirurgias Realizadas', sub: 'mês ref · qtde · R$' },
 ]
 
-function calcularMetrics(itens: SolicitacaoImportada[], mesReferencia: string): Metrics {
-  const cotacoes = itens.filter((s) => s.situacao === 'A vencer')
-  const autorizacoes = itens.filter((s) => s.situacao === 'Aprovado')
-  const agendamentos = autorizacoes.filter((s) => s.data_cirurgia && mesKeyDe(s.data_cirurgia) === mesReferencia)
-  const cirurgias = itens.filter(
-    (s) =>
-      s.situacao &&
-      SITUACOES_REALIZADAS.includes(s.situacao) &&
-      s.data_cirurgia &&
-      mesKeyDe(s.data_cirurgia) === mesReferencia,
-  )
+function calcularMetrics(itens: SolicitacaoImportadaComStatus[], mesReferencia: string, hoje: string): Metrics {
+  // Cotações/Autorizações: carteira em aberto, sem filtro de mês — status_final é a fonte.
+  const cotacoes = itens.filter((s) => STATUS_EM_ABERTO.includes(statusFinalDe(s.report_medico_status)))
+  const autorizacoes = itens.filter((s) => STATUS_AUTORIZADAS.includes(statusFinalDe(s.report_medico_status)))
+  // Agendamentos/Cirurgias: mês de referência — data + situação, não status_final.
+  const agendamentos = itens.filter((s) => agendadaNoMes(s, mesReferencia, hoje))
+  const cirurgias = itens.filter((s) => cirurgiaRealizadaNoMes(s, mesReferencia, hoje))
   return {
     cotacoesQtde: cotacoes.length,
     cotacoesValor: cotacoes.reduce((soma, s) => soma + (s.valor_orcamento ?? 0), 0),
@@ -76,19 +104,26 @@ function calcularMetrics(itens: SolicitacaoImportada[], mesReferencia: string): 
     agendamentosQtde: agendamentos.length,
     agendamentosValor: agendamentos.reduce((soma, s) => soma + (s.valor_orcamento ?? 0), 0),
     cirurgiasQtde: cirurgias.length,
-    cirurgiasValor: cirurgias.reduce((soma, s) => soma + (s.valor_realizado ?? 0), 0),
+    cirurgiasValor: cirurgias.reduce((soma, s) => soma + valorDoItem(s), 0),
   }
 }
 
+// Classificação de carteira por médico, replicando a planilha de referência: cotQ/autQ vêm da
+// carteira aberta (status_final, sem filtro de mês); agQ/cirQ vêm do movimento do mês de
+// referência (data + situação). Ordem importa — "sem movimento" tem prioridade sobre as demais.
 function statusDe(metrics: Metrics): StatusFluxo {
-  if (metrics.cotacoesQtde === 0) return 'sem_frequencia'
-  if (metrics.agendamentosQtde === 0 && metrics.cirurgiasQtde === 0) return 'sem_cadencia'
-  return 'saudavel'
+  const semNadaEmAberto = metrics.cotacoesQtde <= 0 && metrics.autorizacoesQtde <= 0
+  const semMovimentoNoMes = metrics.agendamentosQtde <= 0 && metrics.cirurgiasQtde <= 0
+  if (semNadaEmAberto && semMovimentoNoMes) return 'sem_movimento'
+  if (metrics.cotacoesQtde <= 0) return 'sem_frequencia'
+  if (!semMovimentoNoMes) return 'saudavel'
+  return 'sem_cadencia'
 }
 
 function linhaClasse(status: StatusFluxo): string {
   if (status === 'sem_cadencia') return 'bg-[#e8990c]/10 border-l-[3px] border-l-[#e8990c]'
   if (status === 'sem_frequencia') return 'bg-error/10 border-l-[3px] border-l-error'
+  if (status === 'sem_movimento') return 'bg-outline-variant/10 border-l-[3px] border-l-outline-variant'
   return ''
 }
 
@@ -214,10 +249,11 @@ export function PipelineComercialTable({
   mesReferencia,
   mesLabel,
 }: {
-  solicitacoes: SolicitacaoImportada[]
+  solicitacoes: SolicitacaoImportadaComStatus[]
   mesReferencia: string
   mesLabel: string
 }) {
+  const hoje = hojeIso()
   const [sortKey, setSortKey] = useState<SortKey>('cotacoesValor')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set())
@@ -242,7 +278,7 @@ export function PipelineComercialTable({
   }
 
   const arvore = useMemo<RepNode[]>(() => {
-    const porRep = new Map<string, SolicitacaoImportada[]>()
+    const porRep = new Map<string, SolicitacaoImportadaComStatus[]>()
     for (const s of solicitacoes) {
       if (!s.representante_nome) continue
       if (!porRep.has(s.representante_nome)) porRep.set(s.representante_nome, [])
@@ -250,7 +286,7 @@ export function PipelineComercialTable({
     }
 
     return Array.from(porRep.entries()).map(([nomeRep, itensRep]) => {
-      const porMedico = new Map<string, SolicitacaoImportada[]>()
+      const porMedico = new Map<string, SolicitacaoImportadaComStatus[]>()
       for (const s of itensRep) {
         const nomeMedico = s.medico_nome ?? SEM_MEDICO
         if (!porMedico.has(nomeMedico)) porMedico.set(nomeMedico, [])
@@ -259,7 +295,7 @@ export function PipelineComercialTable({
 
       const medicos: MedicoNode[] = Array.from(porMedico.entries())
         .map(([nomeMedico, itensMedico]) => {
-          const porPaciente = new Map<string, SolicitacaoImportada[]>()
+          const porPaciente = new Map<string, SolicitacaoImportadaComStatus[]>()
           for (const s of itensMedico) {
             const nomePaciente = s.paciente_nome ?? SEM_PACIENTE
             if (!porPaciente.has(nomePaciente)) porPaciente.set(nomePaciente, [])
@@ -268,7 +304,7 @@ export function PipelineComercialTable({
 
           const pacientes: PacienteNode[] = Array.from(porPaciente.entries())
             .map(([nomePaciente, itensPaciente]) => {
-              const metrics = calcularMetrics(itensPaciente, mesReferencia)
+              const metrics = calcularMetrics(itensPaciente, mesReferencia, hoje)
               const itens = [...itensPaciente].sort((a, b) => {
                 const dataA = melhorDataDe(a) ?? ''
                 const dataB = melhorDataDe(b) ?? ''
@@ -278,15 +314,15 @@ export function PipelineComercialTable({
             })
             .sort((a, b) => valorTotal(b.metrics) - valorTotal(a.metrics))
 
-          const metrics = calcularMetrics(itensMedico, mesReferencia)
+          const metrics = calcularMetrics(itensMedico, mesReferencia, hoje)
           return { nome: nomeMedico, metrics, status: statusDe(metrics), pacientes }
         })
         .sort((a, b) => valorTotal(b.metrics) - valorTotal(a.metrics))
 
-      const metrics = calcularMetrics(itensRep, mesReferencia)
+      const metrics = calcularMetrics(itensRep, mesReferencia, hoje)
       return { nome: nomeRep, metrics, medicos }
     })
-  }, [solicitacoes, mesReferencia])
+  }, [solicitacoes, mesReferencia, hoje])
 
   const arvoreOrdenada = useMemo(() => {
     const copia = [...arvore]
@@ -316,15 +352,19 @@ export function PipelineComercialTable({
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 px-6 py-3 border-b border-outline-variant/10 bg-surface-container-low/40 text-[11px] font-semibold text-on-surface-variant">
         <span className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-tertiary-container inline-block shrink-0" /> Dentro do fluxo
-          (cotação + autorização + cirurgia)
+          (cotação em aberto + agend./cirurgia no mês)
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-[#e8990c] inline-block shrink-0" /> Sem cadência (cotação sem
-          agend./cirurgia no mês)
+          <span className="w-2 h-2 rounded-full bg-[#e8990c] inline-block shrink-0" /> Sem cadência (cotação em
+          aberto, sem agend./cirurgia no mês)
         </span>
         <span className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-error inline-block shrink-0" /> Sem frequência (sem cotação em
           aberto)
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-outline-variant inline-block shrink-0" /> Sem movimento (nada em
+          aberto nem no mês)
         </span>
       </div>
 
