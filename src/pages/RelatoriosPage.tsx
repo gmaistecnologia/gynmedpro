@@ -294,13 +294,51 @@ export function RelatoriosPage() {
     [doMes],
   )
 
+  // Meta da empresa inteira (metas_comerciais) — usada quando nenhum representante está
+  // filtrado. Continua alimentando o rodapé "Total" de PerformanceRepresentanteTable, que já
+  // lista todos os representantes independente do filtro (tabela à parte, não afetada por isto).
   const meta = useMemo(
     () => metas.find((m) => m.mes_referencia === primeiroDiaDoMes(mesReferencia)),
     [metas, mesReferencia],
   )
 
-  const parcialPct = meta && meta.meta_valor > 0 ? Math.round((parcialValor / meta.meta_valor) * 100) : null
-  const fechParcialPct = meta && meta.meta_valor > 0 ? Math.round((fechParcialValor / meta.meta_valor) * 100) : null
+  // Com o filtro de Representante ativo, "Meta Sugerida" (e os % que dependem dela) passam a
+  // refletir a soma das metas INDIVIDUAIS (metas_representantes) de quem está selecionado — não
+  // faz sentido comparar o parcial de 1 representante com a meta da empresa inteira. Ignora
+  // quem não tem meta individual definida pro mês (soma só quem tem, e avisa no sublabel).
+  const metasIndividuaisSelecionadas = useMemo(() => {
+    if (representantes.length === 0) return []
+    return representantes.map((nome) => ({
+      nome,
+      valor:
+        metasRep.find((m) => m.representante_nome === nome && m.mes_referencia.slice(0, 7) === mesReferencia)
+          ?.meta_valor ?? null,
+    }))
+  }, [representantes, metasRep, mesReferencia])
+
+  const metaSugeridaValor = useMemo(() => {
+    if (representantes.length === 0) return meta?.meta_valor ?? null
+    const definidas = metasIndividuaisSelecionadas.filter((m) => m.valor !== null)
+    if (definidas.length === 0) return null
+    return definidas.reduce((soma, m) => soma + (m.valor ?? 0), 0)
+  }, [representantes, metasIndividuaisSelecionadas, meta])
+
+  const metaSugeridaSublabel = useMemo(() => {
+    if (representantes.length === 0) {
+      return meta ? `${representantesDoMes} representantes` : 'Defina em Configurações'
+    }
+    const definidas = metasIndividuaisSelecionadas.filter((m) => m.valor !== null).length
+    if (definidas === 0) return 'Defina em Configurações'
+    if (representantes.length === 1) return 'Meta individual'
+    return definidas === representantes.length
+      ? `Soma de ${definidas} representantes`
+      : `Soma de ${definidas} de ${representantes.length} — resto sem meta`
+  }, [representantes, metasIndividuaisSelecionadas, meta, representantesDoMes])
+
+  const parcialPct =
+    metaSugeridaValor && metaSugeridaValor > 0 ? Math.round((parcialValor / metaSugeridaValor) * 100) : null
+  const fechParcialPct =
+    metaSugeridaValor && metaSugeridaValor > 0 ? Math.round((fechParcialValor / metaSugeridaValor) * 100) : null
 
   function limparFiltros() {
     setRepresentantes([])
@@ -384,10 +422,8 @@ export function RelatoriosPage() {
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatTile
           label="Meta Sugerida"
-          value={meta ? formatCompactBRL(meta.meta_valor) : '—'}
-          sublabel={
-            meta ? `${representantesDoMes} representantes` : 'Defina em Configurações'
-          }
+          value={metaSugeridaValor !== null ? formatCompactBRL(metaSugeridaValor) : '—'}
+          sublabel={metaSugeridaSublabel}
           dotClass="bg-primary"
         />
         <StatTile
