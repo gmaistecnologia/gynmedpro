@@ -577,6 +577,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      aplicar_status_final_cirurgia_realizada: {
+        Args: never
+        Returns: undefined
+      }
       get_my_role: { Args: never; Returns: string }
       is_admin: { Args: never; Returns: boolean }
       normalizar_nome: { Args: { txt: string }; Returns: string }
