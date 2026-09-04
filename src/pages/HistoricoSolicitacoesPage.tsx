@@ -22,7 +22,7 @@ import {
 } from '../lib/reportMedicoStatus'
 import { alertaProtocolo, CLASSE_LINHA_ALERTA, LIMITE_DIAS_PROTOCOLADO } from '../lib/alertas'
 import { useReportMedicoStatusRealtime } from '../hooks/useReportMedicoStatusRealtime'
-import type { SolicitacaoImportada } from '../lib/types'
+import type { ComRepresentanteEfetivo, SolicitacaoImportada } from '../lib/types'
 
 // A tabela tem mais de 10 mil solicitações — buscar/renderizar tudo de uma vez deixava a tela
 // lenta e travava a navegação. A partir daqui, busca, filtro de status e paginação acontecem no
@@ -49,12 +49,16 @@ const STATUS_OPCOES = [
 // quando o próprio usuário as escolhe no filtro de status.
 const SITUACAO_OCULTA = 'Reprovado'
 
+// representante_efetivo_id/nome são colunas computadas (`*` não as traz sozinho) — carteira do
+// médico tem prioridade sobre o representante_nome do orçamento importado, ver lib/types.ts.
 const SELECT_COM_STATUS =
-  '*, report_medico_status(status_final, data_protocolo, observacoes, atualizado_em)'
+  '*, representante_efetivo_id, representante_efetivo_nome, ' +
+  'report_medico_status(status_final, data_protocolo, observacoes, atualizado_em)'
 
 type StatusExtraComData = StatusExtra & { atualizado_em: string | null }
 
-type Linha = SolicitacaoImportada & { report_medico_status: StatusExtraComData | null }
+type Linha = SolicitacaoImportada &
+  ComRepresentanteEfetivo & { report_medico_status: StatusExtraComData | null }
 
 // data_cirurgia é um `date` puro ('YYYY-MM-DD'); formatar via new Date(...) sofre
 // deslocamento de fuso (vira o dia anterior em UTC-3). Formatação direta na string evita isso.
@@ -341,8 +345,8 @@ export function HistoricoSolicitacoesPage() {
                     {isGestor && (
                       <td className="px-4 py-2.5 text-xs text-on-surface-variant max-w-[160px]">
                         <span className="flex items-center gap-1.5">
-                          <span className="truncate">{s.representante_nome ?? '—'}</span>
-                          {s.representante_nome && perfisPorNome.get(s.representante_nome)?.ativo === false && (
+                          <span className="truncate">{s.representante_efetivo_nome ?? '—'}</span>
+                          {s.representante_efetivo_nome && perfisPorNome.get(s.representante_efetivo_nome)?.ativo === false && (
                             <UsuarioInativoBadge />
                           )}
                         </span>

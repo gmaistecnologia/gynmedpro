@@ -80,7 +80,12 @@ export function RepresentanteDashboardPage() {
     supabase
       .from('solicitacoes_importadas')
       .select('id, paciente_nome, hospital_nome, data_solicitacao, data_cirurgia, hora_cirurgia, descricao_tipo, report_medico_status(status_final)')
-      .eq('representante_id', profile.id)
+      // representante_efetivo_id é uma coluna computada (função Postgres, ver migração
+      // create_carteira_medicos) — carteira do médico tem prioridade sobre o representante_id do
+      // orçamento importado (ComRepresentanteEfetivo em lib/types.ts). Não existe no tipo gerado
+      // de solicitacoes_importadas (não é coluna física), daí o cast — supabase-js só usa esse
+      // literal em tempo de compilação, o filtro chega certinho ao PostgREST em runtime.
+      .eq('representante_efetivo_id' as unknown as 'representante_id', profile.id)
       .gte('data_solicitacao', de)
       .lte('data_solicitacao', ate)
       .order('data_solicitacao', { ascending: false })

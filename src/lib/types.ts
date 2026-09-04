@@ -26,14 +26,28 @@ export type SolicitacaoImportada = Tables<'solicitacoes_importadas'>
 export type MetaComercial = Tables<'metas_comerciais'>
 export type MetaRepresentante = Tables<'metas_representantes'>
 export type ReportMedicoStatus = Tables<'report_medico_status'>
+export type CarteiraMedico = Tables<'carteira_medicos'>
+
+// `representante_efetivo_id`/`representante_efetivo_nome` são colunas computadas do Postgres
+// (funções que recebem a linha inteira — ver migração create_carteira_medicos): o representante
+// da carteira do médico, com fallback pro representante_id/nome do próprio orçamento importado
+// quando o médico não está em nenhuma carteira. Não aparecem em `Tables<'solicitacoes_importadas'>`
+// (não são colunas físicas), por isso ficam adicionadas aqui — precisam ser pedidas explicitamente
+// no `.select()` (ver CAMPOS_SOLICITACOES em RelatoriosPage.tsx e SELECT_COM_STATUS em
+// ReportMedicoPage.tsx) pra virem preenchidas.
+export type ComRepresentanteEfetivo = {
+  representante_efetivo_id: string | null
+  representante_efetivo_nome: string | null
+}
 
 // Usado pelo Painel Comercial (RelatoriosPage e as tabelas que ele alimenta): o pipeline
 // financeiro (cotação/autorização/cirurgia realizada) precisa do rastreamento operacional em
 // `report_medico_status.status_final`, não da coluna `situacao` (snapshot estático da planilha
 // importada, que não reflete o progresso feito depois pelo time — ver correção de 2026-08-31).
-export type SolicitacaoImportadaComStatus = SolicitacaoImportada & {
-  report_medico_status: Pick<ReportMedicoStatus, 'status_final'> | null
-}
+export type SolicitacaoImportadaComStatus = SolicitacaoImportada &
+  ComRepresentanteEfetivo & {
+    report_medico_status: Pick<ReportMedicoStatus, 'status_final'> | null
+  }
 
 export type SolicitacaoComRelacoes = SolicitacaoCirurgica & {
   hospitais: Pick<Hospital, 'id' | 'nome_fantasia' | 'cidade' | 'uf'> | null

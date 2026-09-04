@@ -280,9 +280,9 @@ export function PipelineComercialTable({
   const arvore = useMemo<RepNode[]>(() => {
     const porRep = new Map<string, SolicitacaoImportadaComStatus[]>()
     for (const s of solicitacoes) {
-      if (!s.representante_nome) continue
-      if (!porRep.has(s.representante_nome)) porRep.set(s.representante_nome, [])
-      porRep.get(s.representante_nome)!.push(s)
+      if (!s.representante_efetivo_nome) continue
+      if (!porRep.has(s.representante_efetivo_nome)) porRep.set(s.representante_efetivo_nome, [])
+      porRep.get(s.representante_efetivo_nome)!.push(s)
     }
 
     return Array.from(porRep.entries()).map(([nomeRep, itensRep]) => {

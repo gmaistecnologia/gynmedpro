@@ -22,10 +22,13 @@ import { COLUNAS_REPORT_MEDICO, type ColunaReportMedicoDef, type ColunaReportMed
 import { useReportMedicoStatusRealtime } from '../hooks/useReportMedicoStatusRealtime'
 import { useColunasPersonalizadas } from '../hooks/useColunasPersonalizadas'
 import { componentesIso, deslocarMes, hojeIso, paraIso } from '../lib/dateUtils'
-import type { SolicitacaoImportada } from '../lib/types'
+import type { ComRepresentanteEfetivo, SolicitacaoImportada } from '../lib/types'
 
+// representante_efetivo_id/nome são colunas computadas (`*` não as traz sozinho) — carteira do
+// médico tem prioridade sobre o representante_nome do orçamento importado, ver lib/types.ts.
 const SELECT_COM_STATUS =
-  '*, report_medico_status(status_final, data_protocolo, observacoes, atualizado_em)'
+  '*, representante_efetivo_id, representante_efetivo_nome, ' +
+  'report_medico_status(status_final, data_protocolo, observacoes, atualizado_em)'
 
 // Situação (vinda da planilha) que fica escondida por padrão: reprovadas poluem a operação do
 // dia a dia, mas continuam a um clique de distância pelo botão "Reprovadas".
@@ -44,7 +47,7 @@ type StatusExtra = {
   atualizado_em: string | null
 }
 
-type Linha = SolicitacaoImportada & { report_medico_status: StatusExtra | null }
+type Linha = SolicitacaoImportada & ComRepresentanteEfetivo & { report_medico_status: StatusExtra | null }
 
 type SortKey = 'data_solicitacao' | 'data_protocolo' | 'data_cirurgia'
 
@@ -326,7 +329,7 @@ export function ReportMedicoPage() {
       medicos: new Set<string>(),
     }
     for (const r of linhas) {
-      if (r.representante_nome) conjuntos.representantes.add(r.representante_nome)
+      if (r.representante_efetivo_nome) conjuntos.representantes.add(r.representante_efetivo_nome)
       if (r.descricao_tipo) conjuntos.procedimentos.add(r.descricao_tipo)
       if (r.plano_saude_nome) conjuntos.convenios.add(r.plano_saude_nome)
       if (r.hospital_nome) conjuntos.hospitais.add(r.hospital_nome)
@@ -357,7 +360,7 @@ export function ReportMedicoPage() {
     return linhas.filter((r) => {
       if (!filtros.mostrarReprovadas && r.situacao === SITUACAO_OCULTA) return false
       if (filtros.somenteAlertas && !alertaDe(r)) return false
-      if (filtros.representantes.length && !filtros.representantes.includes(r.representante_nome ?? '')) return false
+      if (filtros.representantes.length && !filtros.representantes.includes(r.representante_efetivo_nome ?? '')) return false
       if (filtros.procedimentos.length && !filtros.procedimentos.includes(r.descricao_tipo ?? '')) return false
       if (filtros.convenios.length && !filtros.convenios.includes(r.plano_saude_nome ?? '')) return false
       if (filtros.hospitais.length && !filtros.hospitais.includes(r.hospital_nome ?? '')) return false
@@ -498,7 +501,7 @@ export function ReportMedicoPage() {
       case 'representante':
         return (
           <td key={chave} className="px-4 py-3 text-sm text-on-surface truncate max-w-[160px]">
-            {r.representante_nome ?? '—'}
+            {r.representante_efetivo_nome ?? '—'}
           </td>
         )
       case 'medico':

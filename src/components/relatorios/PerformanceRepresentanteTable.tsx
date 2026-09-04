@@ -138,11 +138,11 @@ export function PerformanceRepresentanteTable({
     const doMes = solicitacoes.filter((s) => s.data_cirurgia && mesKeyDe(s.data_cirurgia) === mesReferencia)
 
     const nomesRepresentantes = new Set<string>()
-    for (const s of solicitacoes) if (s.representante_nome) nomesRepresentantes.add(s.representante_nome)
+    for (const s of solicitacoes) if (s.representante_efetivo_nome) nomesRepresentantes.add(s.representante_efetivo_nome)
 
     return Array.from(nomesRepresentantes).map((nome) => {
-      const doRepNoMes = doMes.filter((s) => s.representante_nome === nome)
-      const doRepTodoPeriodo = solicitacoes.filter((s) => s.representante_nome === nome)
+      const doRepNoMes = doMes.filter((s) => s.representante_efetivo_nome === nome)
+      const doRepTodoPeriodo = solicitacoes.filter((s) => s.representante_efetivo_nome === nome)
 
       const realizadasDoRep = doRepNoMes.filter((s) => cirurgiaRealizadaNoMes(s, mesReferencia, hoje))
       const parcial = realizadasDoRep.reduce((soma, s) => soma + valorRealizadoOuOrcamento(s), 0)

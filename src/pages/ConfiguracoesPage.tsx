@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { Tabs } from '../components/ui/Tabs'
 import { MetasSection } from '../components/configuracoes/MetasSection'
 import { UsuariosSection } from '../components/configuracoes/UsuariosSection'
+import { CarteiraSection } from '../components/configuracoes/CarteiraSection'
 
 const TABS = [
   { id: 'metas', label: 'Metas', icon: 'trending_up' },
   { id: 'usuarios', label: 'Usuários', icon: 'group' },
+  { id: 'carteira', label: 'Carteira', icon: 'medical_services' },
 ]
 
 export function ConfiguracoesPage() {
@@ -20,7 +22,9 @@ export function ConfiguracoesPage() {
         </div>
       </header>
 
-      {tabAtiva === 'metas' ? <MetasSection /> : <UsuariosSection />}
+      {tabAtiva === 'metas' && <MetasSection />}
+      {tabAtiva === 'usuarios' && <UsuariosSection />}
+      {tabAtiva === 'carteira' && <CarteiraSection />}
     </div>
   )
 }

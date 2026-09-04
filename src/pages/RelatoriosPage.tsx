@@ -79,8 +79,13 @@ const MESES_ABREV = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SE
 // paciente_nome e os campos de detalhe (hospital, nº de agendamento/orçamento, datas do fluxo)
 // alimentam o painel lateral de "Pipeline Comercial por Representante" — sem eles, todo paciente
 // cai no fallback "Sem paciente informado" mesmo quando a planilha importada tem o nome.
+// representante_efetivo_nome/id são colunas computadas (carteira do médico tem prioridade sobre
+// o representante_nome do orçamento importado — ver ComRepresentanteEfetivo em lib/types.ts e a
+// migração create_carteira_medicos) — é isso que o Painel Comercial usa pra agrupar por
+// representante, não o representante_nome cru.
 const CAMPOS_SOLICITACOES =
   'id, paciente_nome, data_cirurgia, situacao, valor_realizado, valor_orcamento, representante_nome, ' +
+  'representante_efetivo_id, representante_efetivo_nome, ' +
   'descricao_tipo, medico_nome, plano_saude_nome, hospital_nome, nro_agendamento, nro_orcamento, ' +
   'data_solicitacao, data_orcamento, data_aprovacao, report_medico_status(status_final)'
 
@@ -143,6 +148,10 @@ export function RelatoriosPage() {
   const [metas, setMetas] = useState<MetaComercial[]>([])
   const [metasRep, setMetasRep] = useState<MetaRepresentante[]>([])
   const [loading, setLoading] = useState(true)
+  const [erro, setErro] = useState<string | null>(null)
+  // Incrementado pelo botão "Tentar novamente" só pra disparar o efeito de carga de novo, sem
+  // precisar recarregar a página inteira.
+  const [tentativa, setTentativa] = useState(0)
 
   const [mesReferenciaSelecionada, setMesReferenciaSelecionada] = useState('')
   const [representantes, setRepresentantes] = useState<string[]>([])
@@ -152,27 +161,53 @@ export function RelatoriosPage() {
 
   useEffect(() => {
     async function load() {
-      const [solicitacoesData, { data: metasData }, { data: metasRepData }] = await Promise.all([
-        fetchTodasPaginas<SolicitacaoImportadaComStatus>((offset, limite) =>
-          supabase
-            .from('solicitacoes_importadas')
-            .select(CAMPOS_SOLICITACOES)
-            .order('id', { ascending: true })
-            .range(offset, offset + limite - 1)
-            // CAMPOS_SOLICITACOES é uma variável (não um literal), então o supabase-js não
-            // consegue inferir o formato exato da linha selecionada a partir da string.
-            .then(({ data, error }) => ({ data: data as unknown as SolicitacaoImportadaComStatus[] | null, error })),
-        ),
-        supabase.from('metas_comerciais').select('*'),
-        supabase.from('metas_representantes').select('*'),
-      ])
-      setSolicitacoes(solicitacoesData)
-      setMetas((metasData as MetaComercial[]) ?? [])
-      setMetasRep((metasRepData as MetaRepresentante[]) ?? [])
-      setLoading(false)
+      // Sem try/catch aqui, um erro em qualquer uma das páginas (ex.: o Postgres cancelando a
+      // query por estourar o statement_timeout sob RLS) derrubava a Promise.all inteira sem
+      // nunca chamar setLoading(false) — a tela ficava presa em "Carregando…" pra sempre, o que
+      // parecia lentidão infinita mas na prática era um request que já tinha falhado.
+      try {
+        const [solicitacoesData, { data: metasData }, { data: metasRepData }] = await Promise.all([
+          fetchTodasPaginas<SolicitacaoImportadaComStatus>((offset, limite, comContagem) =>
+            supabase
+              .from('solicitacoes_importadas')
+              // `count: 'exact'` habilita a busca em paralelo em fetchTodasPaginas (ver o
+              // comentário lá) — mas só a primeira página deve pedir, daí o `comContagem`: pedir
+              // em todas fazia o Postgres recontar a tabela inteira sob RLS 11 vezes ao mesmo
+              // tempo, em vez de 1.
+              .select(CAMPOS_SOLICITACOES, comContagem ? { count: 'exact' } : undefined)
+              .order('id', { ascending: true })
+              .range(offset, offset + limite - 1)
+              // CAMPOS_SOLICITACOES é uma variável (não um literal), então o supabase-js não
+              // consegue inferir o formato exato da linha selecionada a partir da string.
+              .then(({ data, error, count }) => ({
+                data: data as unknown as SolicitacaoImportadaComStatus[] | null,
+                error,
+                count,
+              })),
+          ),
+          supabase.from('metas_comerciais').select('*'),
+          supabase.from('metas_representantes').select('*'),
+        ])
+        setSolicitacoes(solicitacoesData)
+        setMetas((metasData as MetaComercial[]) ?? [])
+        setMetasRep((metasRepData as MetaRepresentante[]) ?? [])
+      } catch (e) {
+        console.error('Falha ao carregar dados do Painel Comercial:', e)
+        setErro('Não foi possível carregar os dados do Painel Comercial. Tente novamente.')
+      } finally {
+        setLoading(false)
+      }
     }
     load()
-  }, [])
+  }, [tentativa])
+
+  function recarregar() {
+    // `setLoading`/`setErro` aqui rodam num handler de clique, não direto no corpo do efeito —
+    // por isso não caem na regra do eslint que bloqueia setState síncrono dentro de useEffect.
+    setErro(null)
+    setLoading(true)
+    setTentativa((t) => t + 1)
+  }
 
   const mesesDisponiveis = useMemo(() => {
     const chaves = new Set<string>()
@@ -195,7 +230,7 @@ export function RelatoriosPage() {
     const medicosSet = new Set<string>()
     const conveniosSet = new Set<string>()
     for (const s of solicitacoes) {
-      if (s.representante_nome) representantesSet.add(s.representante_nome)
+      if (s.representante_efetivo_nome) representantesSet.add(s.representante_efetivo_nome)
       if (s.descricao_tipo) procedimentosSet.add(s.descricao_tipo)
       if (s.medico_nome) medicosSet.add(s.medico_nome)
       if (s.plano_saude_nome) conveniosSet.add(s.plano_saude_nome)
@@ -214,7 +249,7 @@ export function RelatoriosPage() {
 
   const filtradas = useMemo(() => {
     return solicitacoes.filter((s) => {
-      if (representantes.length > 0 && !representantes.includes(s.representante_nome ?? '')) return false
+      if (representantes.length > 0 && !representantes.includes(s.representante_efetivo_nome ?? '')) return false
       if (procedimentos.length > 0 && !procedimentos.includes(s.descricao_tipo ?? '')) return false
       if (medicos.length > 0 && !medicos.includes(s.medico_nome ?? '')) return false
       if (convenios.length > 0 && !convenios.includes(s.plano_saude_nome ?? '')) return false
@@ -290,7 +325,7 @@ export function RelatoriosPage() {
   )
 
   const representantesDoMes = useMemo(
-    () => new Set(doMes.map((s) => s.representante_nome).filter(Boolean)).size,
+    () => new Set(doMes.map((s) => s.representante_efetivo_nome).filter(Boolean)).size,
     [doMes],
   )
 
@@ -345,6 +380,23 @@ export function RelatoriosPage() {
     setProcedimentos([])
     setMedicos([])
     setConvenios([])
+  }
+
+  if (erro) {
+    return (
+      <div className="flex flex-col items-start gap-3">
+        <div className="bg-error-container text-on-error-container text-sm font-medium rounded-lg px-4 py-3">
+          {erro}
+        </div>
+        <button
+          type="button"
+          onClick={recarregar}
+          className="text-sm font-semibold text-primary hover:underline"
+        >
+          Tentar novamente
+        </button>
+      </div>
+    )
   }
 
   if (loading) {
